@@ -83,15 +83,7 @@ struct ApplicationQueryTests {
         ])
 
         #expect(result.exitCode != 0, "Command should fail when target app is not running")
-
-        guard let output = result.output,
-              let responseData = output.data(using: String.Encoding.utf8)
-        else {
-            throw TestError.generic("No output")
-        }
-
-        let errorResponse = try JSONDecoder().decode(ErrorResponse.self, from: responseData)
-        #expect(errorResponse.commandId == "argument_error")
-        #expect(errorResponse.error.message.contains("Could not find a running app"))
+        #expect(result.output?.isEmpty ?? true)
+        #expect(result.errorOutput?.contains("Could not find a running app") == true)
     }
 }

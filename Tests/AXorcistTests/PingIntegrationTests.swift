@@ -2,36 +2,33 @@ import Foundation
 import Testing
 @testable import AXorcist
 
-@Suite("AXorcist Legacy JSON CLI Disabled Tests", .tags(.safe))
+@Suite("AXorcist CLI UX Tests", .tags(.safe))
 struct PingIntegrationTests {
     @Test("Rejects legacy --stdin flag", .tags(.safe))
     func rejectsLegacyStdinFlag() throws {
         let result = try runAXORCCommand(arguments: ["--stdin"])
         #expect(result.exitCode != 0)
-
-        let errorResponse = try self.decodeErrorResponse(from: result.output)
-        #expect(errorResponse.commandId == "argument_error")
-        #expect(errorResponse.error.message.contains("Unknown option --stdin"))
+        #expect(result.output?.isEmpty ?? true)
+        #expect(result.errorOutput?.contains("error: Unknown option --stdin") == true)
+        #expect(result.errorOutput?.contains("axorc --help") == true)
     }
 
     @Test("Rejects legacy --file flag", .tags(.safe))
     func rejectsLegacyFileFlag() throws {
         let result = try runAXORCCommand(arguments: ["--file", "/tmp/legacy.json"])
         #expect(result.exitCode != 0)
-
-        let errorResponse = try self.decodeErrorResponse(from: result.output)
-        #expect(errorResponse.commandId == "argument_error")
-        #expect(errorResponse.error.message.contains("Unknown option --file"))
+        #expect(result.output?.isEmpty ?? true)
+        #expect(result.errorOutput?.contains("error: Unknown option --file") == true)
+        #expect(result.errorOutput?.contains("axorc --help") == true)
     }
 
     @Test("Rejects legacy --json flag", .tags(.safe))
     func rejectsLegacyJSONFlag() throws {
         let result = try runAXORCCommand(arguments: ["--json", "{}"])
         #expect(result.exitCode != 0)
-
-        let errorResponse = try self.decodeErrorResponse(from: result.output)
-        #expect(errorResponse.commandId == "argument_error")
-        #expect(errorResponse.error.message.contains("Unknown option --json"))
+        #expect(result.output?.isEmpty ?? true)
+        #expect(result.errorOutput?.contains("error: Unknown option --json") == true)
+        #expect(result.errorOutput?.contains("axorc --help") == true)
     }
 
     @Test("Rejects legacy positional JSON payload", .tags(.safe))
@@ -39,26 +36,36 @@ struct PingIntegrationTests {
         let payload = #"{"command":"ping"}"#
         let result = try runAXORCCommand(arguments: [payload])
         #expect(result.exitCode != 0)
-
-        let errorResponse = try self.decodeErrorResponse(from: result.output)
-        #expect(errorResponse.commandId == "argument_error")
+        #expect(result.output?.isEmpty ?? true)
+        #expect(result.errorOutput?.contains("error: No CLI mode selected") == true)
+        #expect(result.errorOutput?.contains("axorc --help") == true)
     }
 
     @Test("Rejects empty invocation without selector or AX exposure mode", .tags(.safe))
     func rejectsNoModeInvocation() throws {
         let result = try runAXORCCommand(arguments: [])
         #expect(result.exitCode != 0)
-
-        let errorResponse = try self.decodeErrorResponse(from: result.output)
-        #expect(errorResponse.commandId == "argument_error")
-        #expect(errorResponse.error.message.contains("No CLI mode selected"))
+        #expect(result.output?.isEmpty ?? true)
+        #expect(result.errorOutput?.contains("error: No CLI mode selected") == true)
+        #expect(result.errorOutput?.contains("axorc --help") == true)
     }
 
-    private func decodeErrorResponse(from output: String?) throws -> ErrorResponse {
-        guard let output, let data = output.data(using: .utf8) else {
-            Issue.record("Expected JSON error output from CLI, received nil/invalid output.")
-            throw CancellationError()
-        }
-        return try JSONDecoder().decode(ErrorResponse.self, from: data)
+    @Test("Prints help with --help", .tags(.safe))
+    func printsHelpLongFlag() throws {
+        let result = try runAXORCCommand(arguments: ["--help"])
+        #expect(result.exitCode == 0)
+        #expect(result.errorOutput?.isEmpty ?? true)
+        #expect(result.output?.contains("USAGE") == true)
+        #expect(result.output?.contains("OPTIONS") == true)
+        #expect(result.output?.contains("--selector") == true)
+    }
+
+    @Test("Prints help with help command", .tags(.safe))
+    func printsHelpCommand() throws {
+        let result = try runAXORCCommand(arguments: ["help"])
+        #expect(result.exitCode == 0)
+        #expect(result.errorOutput?.isEmpty ?? true)
+        #expect(result.output?.contains("USAGE") == true)
+        #expect(result.output?.contains("--enable-ax") == true)
     }
 }

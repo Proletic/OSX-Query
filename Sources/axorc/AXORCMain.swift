@@ -9,30 +9,26 @@ import Foundation
 @main
 struct AXORCCommand: ParsableCommand {
     static func main() async {
-        do {
-            let parsedValues = try Self.parseCommandLineArguments()
-            var command = AXORCCommand()
-            try command.apply(parsedValues: parsedValues)
-            try await command.run()
-        } catch let error as CommanderError {
-            Self.emitArgumentError(message: error.description)
-            Foundation.exit(ExitCode.failure.rawValue)
-        } catch let validation as ValidationError {
-            Self.emitArgumentError(message: validation.description)
-            Foundation.exit(ExitCode.failure.rawValue)
-        } catch let exitCode as ExitCode {
-            Foundation.exit(exitCode.rawValue)
-        } catch {
-            fputs("axorc error: \(error)\n", stderr)
-            Foundation.exit(1)
-        }
+        let code = await AXORCCLIEntrypoint.run(arguments: Array(CommandLine.arguments.dropFirst()))
+        Foundation.exit(code)
     }
 
     @preconcurrency nonisolated static var commandDescription: CommandDescription {
         let version = MainActor.assumeIsolated { axorcVersion }
         return CommandDescription(
             commandName: "axorc",
-            abstract: "AXORC CLI - OXQ selector query mode. Version \(version)")
+            abstract: "AXORC CLI - OXQ selector query mode. Version \(version)",
+            usageExamples: [
+                CommandUsageExample(
+                    command: "axorc --app com.apple.TextEdit --selector \"AXTextArea\"",
+                    description: "Query an app with the OXQ selector language."),
+                CommandUsageExample(
+                    command: "axorc --app com.apple.TextEdit --selector -i",
+                    description: "Open the interactive full-screen query TUI."),
+                CommandUsageExample(
+                    command: "axorc --enable-ax com.apple.TextEdit",
+                    description: "Temporarily focus an app and apply AX exposure attributes."),
+            ])
     }
 
     // `--debug` now enables *normal* diagnostic output. Use the new `--verbose` flag for the extremely chatty logs.
@@ -452,12 +448,11 @@ struct AXORCCommand: ParsableCommand {
 // MARK: - Commander Parsing
 
 extension AXORCCommand {
-    private static func parseCommandLineArguments() throws -> ParsedValues {
+    static func parseCommandLineArguments(arguments: [String]) throws -> ParsedValues {
         let prototype = Self()
         let signature = CommandSignature.describe(prototype)
         let parser = CommandParser(signature: signature)
-        let rawArguments = Array(CommandLine.arguments.dropFirst())
-        let normalizedArguments = Self.normalizeArguments(rawArguments)
+        let normalizedArguments = Self.normalizeArguments(arguments)
         return try parser.parse(arguments: normalizedArguments)
     }
 
@@ -485,7 +480,7 @@ extension AXORCCommand {
         return normalized
     }
 
-    private mutating func apply(parsedValues: ParsedValues) throws {
+    mutating func apply(parsedValues: ParsedValues) throws {
         self.debug = parsedValues.flags.contains("debug")
         self.verbose = parsedValues.flags.contains("verbose")
         self.scanAll = parsedValues.flags.contains("scanAll")
