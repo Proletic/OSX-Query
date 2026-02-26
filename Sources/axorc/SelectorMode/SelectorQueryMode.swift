@@ -479,7 +479,7 @@ struct SelectorQueryRunner {
 @MainActor
 private enum LiveSelectorQueryExecutor {
     private static let setValueSubmitStepDelaySeconds: TimeInterval = 0.2
-    private static let sendKeystrokesSubmitStepDelaySeconds: TimeInterval = 0.2
+    private static let sendKeystrokesSubmitStepDelaySeconds: TimeInterval = 0.3
     private static let postActivationClickDelaySeconds: TimeInterval = 0.2
 
     static func execute(_ request: SelectorQueryRequest) throws -> SelectorQueryResult
