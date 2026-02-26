@@ -36,6 +36,25 @@ struct SelectorQueryRequest: Equatable {
     let limit: Int
     let colorEnabled: Bool
     let showPath: Bool
+    let showNameSource: Bool
+
+    init(
+        appIdentifier: String,
+        selector: String,
+        maxDepth: Int,
+        limit: Int,
+        colorEnabled: Bool,
+        showPath: Bool,
+        showNameSource: Bool = false)
+    {
+        self.appIdentifier = appIdentifier
+        self.selector = selector
+        self.maxDepth = maxDepth
+        self.limit = limit
+        self.colorEnabled = colorEnabled
+        self.showPath = showPath
+        self.showNameSource = showNameSource
+    }
 }
 
 enum SelectorQueryRequestBuilder {
@@ -50,6 +69,7 @@ enum SelectorQueryRequestBuilder {
         limit: Int?,
         noColor: Bool,
         showPath: Bool,
+        showNameSource: Bool = false,
         hasStructuredInput: Bool,
         stdoutSupportsANSI: Bool) throws -> SelectorQueryRequest?
     {
@@ -91,7 +111,8 @@ enum SelectorQueryRequestBuilder {
             maxDepth: maxDepth ?? unlimitedMaxDepth,
             limit: resolvedLimit,
             colorEnabled: stdoutSupportsANSI && !noColor,
-            showPath: showPath)
+            showPath: showPath,
+            showNameSource: showNameSource)
     }
 }
 

@@ -70,6 +70,9 @@ struct AXORCCommand: ParsableCommand {
     @Flag(name: .customLong("show-path"), help: "Include full generated path per selector match.")
     var showPath: Bool = false
 
+    @Flag(name: .customLong("show-name-source"), help: "Include computed name source (e.g. AXTitle) per selector match.")
+    var showNameSource: Bool = false
+
     @Option(
         name: .customLong("enable-ax"),
         help: "Enable AXEnhancedUserInterface and AXManualAccessibility for a running bundle id. Temporarily focuses target app and restores original focus.")
@@ -299,7 +302,7 @@ struct AXORCCommand: ParsableCommand {
     private func hasAnySelectorInput() -> Bool {
         let hasApp = !(self.app?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         let hasSelector = !(self.selector?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-        return hasApp || hasSelector || self.selectorMaxDepth != nil || self.limit != nil || self.noColor || self.showPath
+        return hasApp || hasSelector || self.selectorMaxDepth != nil || self.limit != nil || self.noColor || self.showPath || self.showNameSource
     }
 
     private mutating func buildAXExposureRequestIfNeeded() throws -> AXExposureRequest? {
@@ -334,6 +337,7 @@ struct AXORCCommand: ParsableCommand {
                 limit: self.limit,
                 noColor: self.noColor,
                 showPath: self.showPath,
+                showNameSource: self.showNameSource,
                 hasStructuredInput: self.hasAnyStructuredInput(),
                 stdoutSupportsANSI: OutputCapabilities.stdoutSupportsANSI)
         } catch let selectorError as SelectorQueryCLIError {
@@ -440,6 +444,7 @@ extension AXORCCommand {
         self.noStopFirst = parsedValues.flags.contains("noStopFirst")
         self.noColor = parsedValues.flags.contains("noColor")
         self.showPath = parsedValues.flags.contains("showPath")
+        self.showNameSource = parsedValues.flags.contains("showNameSource")
 
         if let fileValue = parsedValues.options["file"]?.last {
             self.file = fileValue

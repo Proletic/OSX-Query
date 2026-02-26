@@ -68,7 +68,7 @@ struct SelectorQueryOutputFormatterTests {
 
         #expect(lines[1].contains("[1] AXButton"))
         #expect(lines[1].contains("name=\"Save\""))
-        #expect(lines[1].contains("name_source=\"AXTitle\""))
+        #expect(!lines[1].contains("name_source=\""))
         #expect(lines[1].contains("role_desc=\"button\""))
         #expect(!lines[1].contains("title=\"Save\""))
         #expect(lines[1].contains("id=\"save-button\""))
@@ -79,7 +79,7 @@ struct SelectorQueryOutputFormatterTests {
 
         #expect(lines[2].contains("[2] AXTextField"))
         #expect(lines[2].contains("name=\"Query\""))
-        #expect(lines[2].contains("name_source=\"AXPlaceholderValue\""))
+        #expect(!lines[2].contains("name_source=\""))
         #expect(lines[2].contains("role_desc=\"text field\""))
         #expect(lines[2].contains("value=\"line1 line2\""))
         #expect(!lines[2].contains("focused"))
@@ -214,6 +214,55 @@ struct SelectorQueryOutputFormatterTests {
 
         let output = SelectorQueryOutputFormatter.format(report: report)
         #expect(output.contains("\n    path: AXApplication -> AXWindow -> AXButton"))
+    }
+
+    @Test("Shows name source only when enabled")
+    func showsNameSourceOnlyWhenEnabled() {
+        let withoutSource = SelectorQueryRequest(
+            appIdentifier: "com.apple.TextEdit",
+            selector: "AXButton",
+            maxDepth: 10,
+            limit: 10,
+            colorEnabled: false,
+            showPath: false)
+        let withSource = SelectorQueryRequest(
+            appIdentifier: "com.apple.TextEdit",
+            selector: "AXButton",
+            maxDepth: 10,
+            limit: 10,
+            colorEnabled: false,
+            showPath: false,
+            showNameSource: true)
+
+        let results = [
+            SelectorMatchSummary(
+                role: "AXButton",
+                computedName: "Save",
+                computedNameSource: "AXTitle",
+                title: "Save",
+                value: nil,
+                identifier: nil,
+                descriptionText: nil,
+                path: nil),
+        ]
+
+        let outputWithoutSource = SelectorQueryOutputFormatter.format(report: SelectorQueryExecutionReport(
+            request: withoutSource,
+            elapsedMilliseconds: 1,
+            traversedCount: 1,
+            matchedCount: 1,
+            shownCount: 1,
+            results: results))
+        let outputWithSource = SelectorQueryOutputFormatter.format(report: SelectorQueryExecutionReport(
+            request: withSource,
+            elapsedMilliseconds: 1,
+            traversedCount: 1,
+            matchedCount: 1,
+            shownCount: 1,
+            results: results))
+
+        #expect(!outputWithoutSource.contains("name_source=\"AXTitle\""))
+        #expect(outputWithSource.contains("name_source=\"AXTitle\""))
     }
 
     private func leadingColorCode(in line: String) -> String? {

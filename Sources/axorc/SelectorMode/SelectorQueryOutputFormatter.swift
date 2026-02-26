@@ -18,7 +18,7 @@ enum SelectorQueryOutputFormatter {
 
             if let computedName = element.computedName {
                 detailParts.append("name=\"\(self.sanitize(computedName))\"")
-                if let computedNameSource = element.computedNameSource {
+                if report.request.showNameSource, let computedNameSource = element.computedNameSource {
                     detailParts.append("name_source=\"\(self.sanitize(computedNameSource))\"")
                 }
             }

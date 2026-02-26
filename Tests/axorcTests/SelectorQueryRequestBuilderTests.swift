@@ -37,6 +37,7 @@ struct SelectorQueryRequestBuilderTests {
         #expect(request?.limit == 50)
         #expect(request?.colorEnabled == true)
         #expect(request?.showPath == false)
+        #expect(request?.showNameSource == false)
     }
 
     @Test("Uses explicit max depth when provided")
@@ -97,6 +98,22 @@ struct SelectorQueryRequestBuilderTests {
             stdoutSupportsANSI: true)
 
         #expect(request?.showPath == true)
+    }
+
+    @Test("Enables name source output when --show-name-source is set")
+    func enablesNameSourceOutput() throws {
+        let request = try SelectorQueryRequestBuilder.build(
+            app: "com.apple.TextEdit",
+            selector: "AXButton",
+            maxDepth: nil,
+            limit: nil,
+            noColor: true,
+            showPath: false,
+            showNameSource: true,
+            hasStructuredInput: false,
+            stdoutSupportsANSI: true)
+
+        #expect(request?.showNameSource == true)
     }
 
     @Test("Rejects missing app")
