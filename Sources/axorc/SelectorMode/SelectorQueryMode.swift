@@ -479,7 +479,8 @@ struct SelectorQueryRunner {
 @MainActor
 private enum LiveSelectorQueryExecutor {
     private static let setValueSubmitStepDelaySeconds: TimeInterval = 0.2
-    private static let sendKeystrokesSubmitStepDelaySeconds: TimeInterval = 0.5
+    private static let sendKeystrokesSubmitStepDelaySeconds: TimeInterval = 0.2
+    private static let postActivationClickDelaySeconds: TimeInterval = 0.2
 
     static func execute(_ request: SelectorQueryRequest) throws -> SelectorQueryResult
     {
@@ -722,7 +723,9 @@ private enum LiveSelectorQueryExecutor {
 
     @MainActor
     private static func clickElement(_ element: Element) -> Bool {
-        _ = self.activateOwningApplication(for: element)
+        if self.activateOwningApplication(for: element) {
+            Thread.sleep(forTimeInterval: self.postActivationClickDelaySeconds)
+        }
         return ((try? element.click()) != nil)
     }
 
