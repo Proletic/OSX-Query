@@ -481,6 +481,8 @@ private enum LiveSelectorQueryExecutor {
     private static let setValueSubmitStepDelaySeconds: TimeInterval = 0.2
     private static let sendKeystrokesSubmitStepDelaySeconds: TimeInterval = 0.3
     private static let postActivationClickDelaySeconds: TimeInterval = 0.2
+    private static let textInputFocusRetryDelaySeconds: TimeInterval = 0.2
+    private static let textInputFocusRetryMaxAttempts: Int = 7
 
     static func execute(_ request: SelectorQueryRequest) throws -> SelectorQueryResult
     {
@@ -656,7 +658,7 @@ private enum LiveSelectorQueryExecutor {
         case let .setValue(value):
             succeeded = targetElement.setValue(value, forAttribute: AXAttributeNames.kAXValueAttribute)
         case let .setValueAndSubmit(value):
-            guard self.clickElement(targetElement) else {
+            guard self.clickForSetValueSubmit(targetElement) else {
                 succeeded = false
                 break
             }
@@ -675,13 +677,7 @@ private enum LiveSelectorQueryExecutor {
                 succeeded = false
             }
         case let .sendKeystrokesAndSubmit(value):
-            guard self.clickElement(targetElement) else {
-                succeeded = false
-                break
-            }
-            Thread.sleep(forTimeInterval: self.sendKeystrokesSubmitStepDelaySeconds)
-
-            guard self.clickElement(targetElement) else {
+            guard self.clickForSendKeystrokesSubmit(targetElement) else {
                 succeeded = false
                 break
             }
@@ -769,6 +765,67 @@ private enum LiveSelectorQueryExecutor {
         }
 
         return nil
+    }
+
+    @MainActor
+    private static func clickForSetValueSubmit(_ element: Element) -> Bool {
+        if self.shouldRetryFocusClicks(for: element) {
+            return self.clickUntilFocused(element)
+        }
+        return self.clickElement(element)
+    }
+
+    @MainActor
+    private static func clickForSendKeystrokesSubmit(_ element: Element) -> Bool {
+        if self.shouldRetryFocusClicks(for: element) {
+            return self.clickUntilFocused(element)
+        }
+
+        guard self.clickElement(element) else {
+            return false
+        }
+        Thread.sleep(forTimeInterval: self.sendKeystrokesSubmitStepDelaySeconds)
+        return self.clickElement(element)
+    }
+
+    @MainActor
+    private static func clickUntilFocused(_ element: Element) -> Bool {
+        if self.activateOwningApplication(for: element) {
+            Thread.sleep(forTimeInterval: self.postActivationClickDelaySeconds)
+        }
+
+        for attempt in 1...self.textInputFocusRetryMaxAttempts {
+            guard ((try? element.click()) != nil) else {
+                if attempt < self.textInputFocusRetryMaxAttempts {
+                    Thread.sleep(forTimeInterval: self.textInputFocusRetryDelaySeconds)
+                }
+                continue
+            }
+
+            if element.isFocused() == true {
+                return true
+            }
+
+            if attempt < self.textInputFocusRetryMaxAttempts {
+                Thread.sleep(forTimeInterval: self.textInputFocusRetryDelaySeconds)
+            }
+        }
+
+        return false
+    }
+
+    @MainActor
+    private static func shouldRetryFocusClicks(for element: Element) -> Bool {
+        guard let role = element.role() else {
+            return false
+        }
+
+        switch role {
+        case AXRoleNames.kAXComboBoxRole, AXRoleNames.kAXTextFieldRole, AXRoleNames.kAXTextAreaRole:
+            return true
+        default:
+            return false
+        }
     }
 }
 
