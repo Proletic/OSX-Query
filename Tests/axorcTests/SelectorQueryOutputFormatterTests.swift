@@ -23,6 +23,7 @@ struct SelectorQueryOutputFormatterTests {
                 SelectorMatchSummary(
                     role: "AXButton",
                     computedName: "Save",
+                    computedNameSource: "AXTitle",
                     title: "Save",
                     value: nil,
                     identifier: "save-button",
@@ -31,6 +32,7 @@ struct SelectorQueryOutputFormatterTests {
                 SelectorMatchSummary(
                     role: "AXTextField",
                     computedName: "Query",
+                    computedNameSource: "AXPlaceholderValue",
                     title: nil,
                     value: "line1\nline2",
                     identifier: nil,
@@ -51,12 +53,14 @@ struct SelectorQueryOutputFormatterTests {
 
         #expect(lines[1].contains("[1] AXButton"))
         #expect(lines[1].contains("name=\"Save\""))
+        #expect(lines[1].contains("name_source=\"AXTitle\""))
         #expect(!lines[1].contains("title=\"Save\""))
         #expect(lines[1].contains("id=\"save-button\""))
         #expect(lines[1].contains("desc=\"Save current document\""))
 
         #expect(lines[2].contains("[2] AXTextField"))
         #expect(lines[2].contains("name=\"Query\""))
+        #expect(lines[2].contains("name_source=\"AXPlaceholderValue\""))
         #expect(lines[2].contains("value=\"line1 line2\""))
         #expect(!output.contains("\n    path: "))
     }
@@ -173,6 +177,7 @@ struct SelectorQueryOutputFormatterTests {
                 SelectorMatchSummary(
                     role: "AXButton",
                     computedName: "Save",
+                    computedNameSource: "AXTitle",
                     title: "Save",
                     value: nil,
                     identifier: nil,

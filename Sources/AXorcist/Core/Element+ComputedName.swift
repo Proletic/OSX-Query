@@ -3,10 +3,26 @@ import Foundation
 // GlobalAXLogger is assumed available
 
 extension Element {
+    public struct ComputedNameDetails: Equatable, Sendable {
+        public let value: String
+        public let source: String
+
+        public init(value: String, source: String) {
+            self.value = value
+            self.source = source
+        }
+    }
+
     /// Computes a human-readable name for the element based on various attributes.
     /// This is useful for logging and debugging, and can be part of the `collectAll` output.
     @MainActor
     public func computedName() -> String? {
+        self.computedNameDetails()?.value
+    }
+
+    /// Computes a human-readable name and reports the source attribute used.
+    @MainActor
+    public func computedNameDetails() -> ComputedNameDetails? {
         let elementDescription = briefDescription(option: .raw)
 
         func nonEmpty(_ value: String?) -> String? {
@@ -31,19 +47,21 @@ extension Element {
 
         for candidate in candidates {
             if let value = candidate.provider() {
-                return self.logComputedName(
+                let resolved = self.logComputedName(
                     source: candidate.source,
                     value: value,
                     elementDescription: elementDescription)
+                return ComputedNameDetails(value: resolved, source: candidate.source)
             }
         }
 
         if let roleName = nonEmpty(role()) {
             let cleanRole = roleName.replacingOccurrences(of: "AX", with: "")
-            return self.logComputedName(
+            let resolved = self.logComputedName(
                 source: "AXRole",
                 value: cleanRole,
                 elementDescription: elementDescription)
+            return ComputedNameDetails(value: resolved, source: "AXRole")
         }
 
         self.logMissingComputedName(elementDescription: elementDescription)

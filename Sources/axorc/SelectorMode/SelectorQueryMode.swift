@@ -113,6 +113,7 @@ struct SelectorQueryResult: Equatable {
 struct SelectorMatchSummary: Equatable {
     let role: String
     let computedName: String?
+    let computedNameSource: String?
     let title: String?
     let value: String?
     let identifier: String?
@@ -122,6 +123,7 @@ struct SelectorMatchSummary: Equatable {
     init(
         role: String,
         computedName: String?,
+        computedNameSource: String? = nil,
         title: String?,
         value: String?,
         identifier: String?,
@@ -130,6 +132,7 @@ struct SelectorMatchSummary: Equatable {
     {
         self.role = role
         self.computedName = computedName
+        self.computedNameSource = computedNameSource
         self.title = title
         self.value = value
         self.identifier = identifier
@@ -139,8 +142,10 @@ struct SelectorMatchSummary: Equatable {
 
     @MainActor
     init(element: Element, includePath: Bool) {
+        let computedNameDetails = element.computedNameDetails()
         self.role = element.role() ?? "AXUnknown"
-        self.computedName = SelectorMatchSummary.normalize(element.computedName())
+        self.computedName = SelectorMatchSummary.normalize(computedNameDetails?.value)
+        self.computedNameSource = SelectorMatchSummary.normalize(computedNameDetails?.source)
         self.title = SelectorMatchSummary.normalize(element.title())
         self.value = SelectorMatchSummary.normalize(SelectorMatchSummary.stringify(element.value()))
         self.identifier = SelectorMatchSummary.normalize(element.identifier())
