@@ -86,7 +86,7 @@ struct AXORCCommand: ParsableCommand {
     @Option(name: .customLong("result-index"), help: "1-based matched selector result index to target for interaction.")
     var selectorResultIndex: Int?
 
-    @Option(name: .long, help: "Interaction for targeted selector result (click, press, focus, set-value).")
+    @Option(name: .long, help: "Interaction for targeted selector result (click, press, focus, set-value, send-keystrokes-submit).")
     var interaction: String?
 
     @Option(name: .customLong("interaction-value"), help: "Value used for --interaction set-value.")

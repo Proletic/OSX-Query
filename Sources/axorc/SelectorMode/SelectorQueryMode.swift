@@ -41,11 +41,11 @@ enum SelectorQueryCLIError: LocalizedError, Equatable {
         case let .invalidResultIndex(index):
             "--result-index must be greater than 0. Received: \(index)."
         case let .unknownInteraction(raw):
-            "Unknown --interaction '\(raw)'. Supported values: click, press, focus, set-value."
+            "Unknown --interaction '\(raw)'. Supported values: click, press, focus, set-value, send-keystrokes-submit."
         case .interactionValueRequired:
-            "--interaction-value is required when --interaction is set to set-value."
+            "--interaction-value is required when --interaction is set to set-value or send-keystrokes-submit."
         case let .interactionValueNotAllowed(action):
-            "--interaction-value is only valid with --interaction set-value (received: \(action))."
+            "--interaction-value is only valid with --interaction set-value or send-keystrokes-submit (received: \(action))."
         case .submitFlagRequiresSetValue:
             "--submit-after-set-value is only valid with --interaction set-value."
         case let .interactionTargetOutOfBounds(index, matchedCount):
@@ -62,6 +62,7 @@ enum SelectorInteractionAction: Equatable {
     case focus
     case setValue(String)
     case setValueAndSubmit(String)
+    case sendKeystrokesAndSubmit(String)
 
     var rawName: String {
         switch self {
@@ -75,6 +76,8 @@ enum SelectorInteractionAction: Equatable {
             return "set-value"
         case .setValueAndSubmit:
             return "set-value-submit"
+        case .sendKeystrokesAndSubmit:
+            return "send-keystrokes-submit"
         }
     }
 }
@@ -218,6 +221,17 @@ enum SelectorQueryRequestBuilder {
                 interactionRequest = SelectorInteractionRequest(
                     resultIndex: resultIndex,
                     action: submitAfterSetValue ? .setValueAndSubmit(interactionValue) : .setValue(interactionValue))
+
+            case "send-keystrokes-submit":
+                if submitAfterSetValue {
+                    throw SelectorQueryCLIError.submitFlagRequiresSetValue
+                }
+                guard let interactionValue else {
+                    throw SelectorQueryCLIError.interactionValueRequired
+                }
+                interactionRequest = SelectorInteractionRequest(
+                    resultIndex: resultIndex,
+                    action: .sendKeystrokesAndSubmit(interactionValue))
 
             default:
                 throw SelectorQueryCLIError.unknownInteraction(trimmedInteraction)
@@ -465,6 +479,7 @@ struct SelectorQueryRunner {
 @MainActor
 private enum LiveSelectorQueryExecutor {
     private static let setValueSubmitStepDelaySeconds: TimeInterval = 0.2
+    private static let sendKeystrokesSubmitStepDelaySeconds: TimeInterval = 0.5
 
     static func execute(_ request: SelectorQueryRequest) throws -> SelectorQueryResult
     {
@@ -654,6 +669,27 @@ private enum LiveSelectorQueryExecutor {
 
             do {
                 try Element.typeKey(.return)
+                succeeded = true
+            } catch {
+                succeeded = false
+            }
+        case let .sendKeystrokesAndSubmit(value):
+            guard ((try? targetElement.click()) != nil) else {
+                succeeded = false
+                break
+            }
+            Thread.sleep(forTimeInterval: self.sendKeystrokesSubmitStepDelaySeconds)
+
+            do {
+                try Element.typeText(value, delay: 0)
+            } catch {
+                succeeded = false
+                break
+            }
+            Thread.sleep(forTimeInterval: self.sendKeystrokesSubmitStepDelaySeconds)
+
+            do {
+                try Element.typeKey(.return, modifiers: [.maskCommand])
                 succeeded = true
             } catch {
                 succeeded = false

@@ -92,6 +92,7 @@ private final class InteractiveSelectorSession {
     private enum InteractionKind {
         case setValue
         case setValueSubmit
+        case sendKeystrokesSubmit
 
         var label: String {
             switch self {
@@ -99,6 +100,8 @@ private final class InteractiveSelectorSession {
                 return "set-value"
             case .setValueSubmit:
                 return "set-value-submit"
+            case .sendKeystrokesSubmit:
+                return "send-keystrokes-submit"
             }
         }
     }
@@ -248,7 +251,7 @@ private final class InteractiveSelectorSession {
     private func shouldRefocusTerminal(after action: SelectorInteractionAction) -> Bool {
         guard self.request.refocusTerminalAfterInteractions else { return false }
         switch action {
-        case .click, .focus, .setValueAndSubmit:
+        case .click, .focus, .setValueAndSubmit, .sendKeystrokesAndSubmit:
             return true
         case .press, .setValue:
             return false
@@ -305,7 +308,7 @@ private final class InteractiveSelectorSession {
             )
 
         case .interactionMenu:
-            lines.append(self.modeLine("mode=interaction | c click | p press | f focus | v set-value | s set-value-submit | q cancel"))
+            lines.append(self.modeLine("mode=interaction | c click | p press | f focus | v set-value | s set-value-submit | k send-keys-submit | q cancel"))
             lines.append(self.statsLine(styled: true))
             lines.append("")
             self.appendResultLines(into: &lines, terminalRows: size.rows)
@@ -600,6 +603,11 @@ private final class InteractiveSelectorSession {
             self.pendingValueCursorIndex = 0
             self.mode = .interactionValueInput(.setValueSubmit)
 
+        case .character("k"):
+            self.pendingValueText = ""
+            self.pendingValueCursorIndex = 0
+            self.mode = .interactionValueInput(.sendKeystrokesSubmit)
+
         case .character("q"), .escape:
             self.mode = .results
             self.statusMessage = "Interaction canceled."
@@ -617,6 +625,8 @@ private final class InteractiveSelectorSession {
                 self.executeInteraction(.setValue(self.pendingValueText))
             case .setValueSubmit:
                 self.executeInteraction(.setValueAndSubmit(self.pendingValueText))
+            case .sendKeystrokesSubmit:
+                self.executeInteraction(.sendKeystrokesAndSubmit(self.pendingValueText))
             }
 
         case .escape:

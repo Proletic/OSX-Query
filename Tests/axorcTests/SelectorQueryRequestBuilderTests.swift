@@ -212,6 +212,25 @@ struct SelectorQueryRequestBuilderTests {
         #expect(request?.interaction?.action == .setValueAndSubmit("hello"))
     }
 
+    @Test("Builds send-keystrokes-submit interaction request when provided")
+    func buildsSendKeystrokesSubmitInteractionRequest() throws {
+        let request = try SelectorQueryRequestBuilder.build(
+            app: "com.apple.TextEdit",
+            selector: "AXTextField",
+            maxDepth: nil,
+            limit: nil,
+            noColor: false,
+            showPath: false,
+            interaction: "send-keystrokes-submit",
+            interactionValue: "hello world",
+            resultIndex: 1,
+            hasStructuredInput: false,
+            stdoutSupportsANSI: true)
+
+        #expect(request?.interaction?.resultIndex == 1)
+        #expect(request?.interaction?.action == .sendKeystrokesAndSubmit("hello world"))
+    }
+
     @Test("Rejects interaction when result index is missing")
     func rejectsInteractionMissingResultIndex() {
         do {
@@ -267,6 +286,29 @@ struct SelectorQueryRequestBuilderTests {
                 noColor: false,
                 showPath: false,
                 interaction: "set-value",
+                interactionValue: nil,
+                resultIndex: 1,
+                hasStructuredInput: false,
+                stdoutSupportsANSI: true)
+            Issue.record("Expected build failure")
+        } catch let error as SelectorQueryCLIError {
+            #expect(error == .interactionValueRequired)
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    @Test("Rejects send-keystrokes-submit interaction when value is missing")
+    func rejectsSendKeystrokesSubmitMissingInteractionValue() {
+        do {
+            _ = try SelectorQueryRequestBuilder.build(
+                app: "com.apple.TextEdit",
+                selector: "AXButton",
+                maxDepth: nil,
+                limit: nil,
+                noColor: false,
+                showPath: false,
+                interaction: "send-keystrokes-submit",
                 interactionValue: nil,
                 resultIndex: 1,
                 hasStructuredInput: false,
