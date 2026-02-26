@@ -244,7 +244,7 @@ private final class InteractiveSelectorSession {
             lines.append(self.modeLine("mode=query | Enter run | q clear | Ctrl+C exit"))
             lines.append("")
             let queryPrefix = "query> "
-            lines.append(self.promptLine(prefix: queryPrefix, value: self.query))
+            lines.append(self.queryPromptLine(prefix: queryPrefix, query: self.query))
             cursorPosition = (
                 row: lines.count,
                 col: min(size.cols, queryPrefix.count + self.queryCursorIndex + 1)
@@ -719,6 +719,14 @@ private final class InteractiveSelectorSession {
         return self.colorize(prefix, InteractiveANSI.brightYellow) + value
     }
 
+    private func queryPromptLine(prefix: String, query: String) -> String {
+        let highlighted = OXQInteractiveSyntaxHighlighter.highlight(query, enabled: self.colorEnabled)
+        if !self.colorEnabled {
+            return prefix + highlighted
+        }
+        return self.colorize(prefix, InteractiveANSI.brightYellow) + highlighted
+    }
+
     private func statusLine(_ value: String) -> String {
         let lowered = value.lowercased()
         if lowered.contains("failed") || lowered.contains("error") || lowered.contains("cannot") {
@@ -1014,6 +1022,174 @@ private extension Character {
     }
 }
 
+enum OXQInteractiveSyntaxHighlighter {
+    static let roleColor = InteractiveANSI.brightYellow
+    static let attributeColor = InteractiveANSI.orange
+    static let stringColor = InteractiveANSI.brightGreen
+    static let functionColor = InteractiveANSI.brightBlue
+    static let resetColor = InteractiveANSI.reset
+
+    static func highlight(_ query: String, enabled: Bool) -> String {
+        guard enabled else { return query }
+
+        var output = ""
+        var index = query.startIndex
+        var attributeBracketDepth = 0
+        var expectingAttributeName = false
+
+        while index < query.endIndex {
+            let character = query[index]
+
+            if character == "[" {
+                output.append(character)
+                attributeBracketDepth += 1
+                expectingAttributeName = true
+                index = query.index(after: index)
+                continue
+            }
+
+            if character == "]" {
+                output.append(character)
+                if attributeBracketDepth > 0 {
+                    attributeBracketDepth -= 1
+                }
+                expectingAttributeName = false
+                index = query.index(after: index)
+                continue
+            }
+
+            if character == "\"" || character == "'" {
+                let (literal, nextIndex) = self.consumeStringLiteral(query, from: index)
+                output += self.paint(literal, color: self.stringColor)
+                index = nextIndex
+                continue
+            }
+
+            if character == ":" {
+                output.append(character)
+                index = query.index(after: index)
+
+                let whitespaceStart = index
+                while index < query.endIndex, query[index].isWhitespaceLike {
+                    index = query.index(after: index)
+                }
+                if whitespaceStart < index {
+                    output += String(query[whitespaceStart..<index])
+                }
+
+                if index < query.endIndex, self.isIdentifierStart(query[index]) {
+                    let identifierStart = index
+                    index = self.consumeIdentifier(in: query, from: identifierStart)
+                    let name = String(query[identifierStart..<index])
+                    output += self.paint(name, color: self.functionColor)
+                }
+                continue
+            }
+
+            if attributeBracketDepth > 0 {
+                if expectingAttributeName {
+                    if character.isWhitespaceLike {
+                        output.append(character)
+                        index = query.index(after: index)
+                        continue
+                    }
+
+                    if character == "," {
+                        output.append(character)
+                        index = query.index(after: index)
+                        expectingAttributeName = true
+                        continue
+                    }
+
+                    if self.isIdentifierStart(character) {
+                        let attributeStart = index
+                        index = self.consumeIdentifier(in: query, from: attributeStart)
+                        let attributeName = String(query[attributeStart..<index])
+                        output += self.paint(attributeName, color: self.attributeColor)
+                        expectingAttributeName = false
+                        continue
+                    }
+
+                    output.append(character)
+                    index = query.index(after: index)
+                    continue
+                }
+
+                if character == "," {
+                    expectingAttributeName = true
+                }
+                output.append(character)
+                index = query.index(after: index)
+                continue
+            }
+
+            if self.isIdentifierStart(character) {
+                let roleStart = index
+                index = self.consumeIdentifier(in: query, from: roleStart)
+                let roleName = String(query[roleStart..<index])
+                output += self.paint(roleName, color: self.roleColor)
+                continue
+            }
+
+            output.append(character)
+            index = query.index(after: index)
+        }
+
+        return output
+    }
+
+    private static func paint(_ token: String, color: String) -> String {
+        color + token + self.resetColor
+    }
+
+    private static func consumeStringLiteral(_ query: String, from startIndex: String.Index) -> (String, String.Index) {
+        let quote = query[startIndex]
+        var index = query.index(after: startIndex)
+        var escaped = false
+
+        while index < query.endIndex {
+            let character = query[index]
+            if escaped {
+                escaped = false
+                index = query.index(after: index)
+                continue
+            }
+            if character == "\\" {
+                escaped = true
+                index = query.index(after: index)
+                continue
+            }
+            if character == quote {
+                index = query.index(after: index)
+                break
+            }
+            index = query.index(after: index)
+        }
+
+        return (String(query[startIndex..<index]), index)
+    }
+
+    private static func consumeIdentifier(in query: String, from start: String.Index) -> String.Index {
+        var index = start
+        while index < query.endIndex, self.isIdentifierContinue(query[index]) {
+            index = query.index(after: index)
+        }
+        return index
+    }
+
+    private static func isIdentifierStart(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { scalar in
+            CharacterSet.letters.contains(scalar) || scalar == "_"
+        }
+    }
+
+    private static func isIdentifierContinue(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { scalar in
+            CharacterSet.alphanumerics.contains(scalar) || scalar == "_" || scalar == "-"
+        }
+    }
+}
+
 private struct InteractiveRoleColorizer {
     private static let colors = [
         InteractiveANSI.red,
@@ -1063,6 +1239,7 @@ private enum InteractiveANSI {
     static let brightMagenta = "\u{001B}[95m"
     static let brightCyan = "\u{001B}[96m"
     static let brightWhite = "\u{001B}[97m"
+    static let orange = "\u{001B}[38;5;208m"
 }
 
 private struct RawTerminalMode {
