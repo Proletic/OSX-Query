@@ -35,7 +35,6 @@ struct SelectorQueryOutputFormatterTests {
                     role: "AXButton",
                     computedName: "Save",
                     computedNameSource: "AXTitle",
-                    roleDescription: "button",
                     isEnabled: false,
                     isFocused: true,
                     childCount: 3,
@@ -48,7 +47,6 @@ struct SelectorQueryOutputFormatterTests {
                     role: "AXTextField",
                     computedName: "Query",
                     computedNameSource: "AXPlaceholderValue",
-                    roleDescription: "text field",
                     isEnabled: true,
                     isFocused: false,
                     childCount: 0,
@@ -73,7 +71,6 @@ struct SelectorQueryOutputFormatterTests {
         #expect(lines[1].contains("[1] AXButton"))
         #expect(lines[1].contains("name=\"Save\""))
         #expect(!lines[1].contains("name_source=\""))
-        #expect(lines[1].contains("role_desc=\"button\""))
         #expect(!lines[1].contains("title=\"Save\""))
         #expect(lines[1].contains("id=\"save-button\""))
         #expect(lines[1].contains("desc=\"Save current document\""))
@@ -84,7 +81,6 @@ struct SelectorQueryOutputFormatterTests {
         #expect(lines[2].contains("[2] AXTextField"))
         #expect(lines[2].contains("name=\"Query\""))
         #expect(!lines[2].contains("name_source=\""))
-        #expect(lines[2].contains("role_desc=\"text field\""))
         #expect(lines[2].contains("value=\"line1 line2\""))
         #expect(!lines[2].contains("focused"))
         #expect(!lines[2].contains("disabled"))
@@ -205,7 +201,6 @@ struct SelectorQueryOutputFormatterTests {
                     role: "AXButton",
                     computedName: "Save",
                     computedNameSource: "AXTitle",
-                    roleDescription: "button",
                     isEnabled: true,
                     isFocused: false,
                     childCount: 1,
@@ -291,7 +286,6 @@ struct SelectorQueryOutputFormatterTests {
                     role: "AXButton",
                     computedName: "nil",
                     computedNameSource: "AXTitle",
-                    roleDescription: "(null)",
                     isEnabled: true,
                     isFocused: false,
                     childCount: 0,
@@ -305,7 +299,6 @@ struct SelectorQueryOutputFormatterTests {
         let output = SelectorQueryOutputFormatter.format(report: report)
         #expect(!output.contains("name=\""))
         #expect(!output.contains("name_source=\""))
-        #expect(!output.contains("role_desc=\""))
         #expect(!output.contains("title=\""))
         #expect(!output.contains("value=\""))
         #expect(!output.contains("id=\""))

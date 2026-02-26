@@ -135,7 +135,6 @@ struct SelectorMatchSummary: Equatable {
     let role: String
     let computedName: String?
     let computedNameSource: String?
-    let roleDescription: String?
     let isEnabled: Bool?
     let isFocused: Bool?
     let childCount: Int?
@@ -149,7 +148,6 @@ struct SelectorMatchSummary: Equatable {
         role: String,
         computedName: String?,
         computedNameSource: String? = nil,
-        roleDescription: String? = nil,
         isEnabled: Bool? = nil,
         isFocused: Bool? = nil,
         childCount: Int? = nil,
@@ -162,7 +160,6 @@ struct SelectorMatchSummary: Equatable {
         self.role = role
         self.computedName = computedName
         self.computedNameSource = computedNameSource
-        self.roleDescription = roleDescription
         self.isEnabled = isEnabled
         self.isFocused = isFocused
         self.childCount = childCount
@@ -177,7 +174,6 @@ struct SelectorMatchSummary: Equatable {
     init(
         element: Element,
         includePath: Bool,
-        roleDescription: String?,
         isEnabled: Bool?,
         isFocused: Bool?,
         childCount: Int?)
@@ -186,7 +182,6 @@ struct SelectorMatchSummary: Equatable {
         self.role = element.role() ?? "AXUnknown"
         self.computedName = SelectorMatchSummary.normalize(computedNameDetails?.value)
         self.computedNameSource = SelectorMatchSummary.normalize(computedNameDetails?.source)
-        self.roleDescription = SelectorMatchSummary.normalize(roleDescription)
         self.isEnabled = isEnabled
         self.isFocused = isFocused
         self.childCount = childCount
@@ -342,9 +337,6 @@ private enum LiveSelectorQueryExecutor {
 
         let shownElements = matchedElements.prefix(request.limit)
         let shownSummaries = shownElements.map { element in
-            let roleDescription = memoizationContext.attributeValue(
-                of: element,
-                attributeName: AXAttributeNames.kAXRoleDescriptionAttribute)
             let isEnabled = self.parseBool(memoizationContext.attributeValue(
                 of: element,
                 attributeName: AXAttributeNames.kAXEnabledAttribute))
@@ -356,7 +348,6 @@ private enum LiveSelectorQueryExecutor {
             return SelectorMatchSummary(
                 element: element,
                 includePath: request.showPath,
-                roleDescription: roleDescription,
                 isEnabled: isEnabled,
                 isFocused: isFocused,
                 childCount: childCount)

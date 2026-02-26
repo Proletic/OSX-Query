@@ -23,10 +23,6 @@ enum SelectorQueryOutputFormatter {
                 }
             }
 
-            if let roleDescription = self.detailValue(element.roleDescription) {
-                detailParts.append("role_desc=\"\(self.sanitize(roleDescription))\"")
-            }
-
             if let title = self.detailValue(element.title) {
                 if title != element.computedName {
                     detailParts.append("title=\"\(self.sanitize(title))\"")
