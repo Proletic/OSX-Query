@@ -647,7 +647,7 @@ private enum LiveSelectorQueryExecutor {
         let succeeded: Bool
         switch interaction.action {
         case .click:
-            succeeded = ((try? targetElement.click()) != nil)
+            succeeded = self.clickElement(targetElement)
         case .press:
             succeeded = targetElement.press()
         case .focus:
@@ -655,7 +655,7 @@ private enum LiveSelectorQueryExecutor {
         case let .setValue(value):
             succeeded = targetElement.setValue(value, forAttribute: AXAttributeNames.kAXValueAttribute)
         case let .setValueAndSubmit(value):
-            guard ((try? targetElement.click()) != nil) else {
+            guard self.clickElement(targetElement) else {
                 succeeded = false
                 break
             }
@@ -674,7 +674,7 @@ private enum LiveSelectorQueryExecutor {
                 succeeded = false
             }
         case let .sendKeystrokesAndSubmit(value):
-            guard ((try? targetElement.click()) != nil) else {
+            guard self.clickElement(targetElement) else {
                 succeeded = false
                 break
             }
@@ -717,7 +717,49 @@ private enum LiveSelectorQueryExecutor {
         if element.press() {
             return true
         }
+        return self.clickElement(element)
+    }
+
+    @MainActor
+    private static func clickElement(_ element: Element) -> Bool {
+        _ = self.activateOwningApplication(for: element)
         return ((try? element.click()) != nil)
+    }
+
+    @MainActor
+    private static func activateOwningApplication(for element: Element) -> Bool {
+        guard let pid = self.owningPID(for: element) else {
+            return false
+        }
+
+        guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else {
+            return false
+        }
+
+        if app.isActive {
+            return true
+        }
+
+        return app.activate(options: [.activateAllWindows])
+    }
+
+    @MainActor
+    private static func owningPID(for element: Element) -> pid_t? {
+        if let pid = element.pid(), pid > 0 {
+            return pid
+        }
+
+        var current = element.parent()
+        var depth = 0
+        while let candidate = current, depth < 256 {
+            if let pid = candidate.pid(), pid > 0 {
+                return pid
+            }
+            current = candidate.parent()
+            depth += 1
+        }
+
+        return nil
     }
 }
 
