@@ -638,7 +638,7 @@ private enum LiveSelectorQueryExecutor {
         case let .setValue(value):
             succeeded = targetElement.setValue(value, forAttribute: AXAttributeNames.kAXValueAttribute)
         case let .setValueAndSubmit(value):
-            guard self.focusElement(targetElement) else {
+            guard ((try? targetElement.click()) != nil) else {
                 succeeded = false
                 break
             }

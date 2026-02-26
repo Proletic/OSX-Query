@@ -84,7 +84,7 @@ struct AXORCCommand: ParsableCommand {
 
     @Flag(
         name: .customLong("submit-after-set-value"),
-        help: "With --interaction set-value, focus the target first, set value, then press Return.")
+        help: "With --interaction set-value, click the target first, set value, then press Return.")
     var submitAfterSetValue: Bool = false
 
     @Option(
