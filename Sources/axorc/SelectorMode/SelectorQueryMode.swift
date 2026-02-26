@@ -216,7 +216,7 @@ private enum LiveSelectorQueryExecutor {
         }
 
         let childrenProvider: (Element) -> [Element] = { element in
-            element.children(strict: false) ?? []
+            element.children(strict: false, includeApplicationExtras: element == root) ?? []
         }
         let roleProvider: (Element) -> String? = { element in
             element.role()

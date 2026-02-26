@@ -27,7 +27,7 @@ struct OXQElementSearch {
     {
         let memoizationContext = OXQQueryMemoizationContext<Element>(
             childrenProvider: { element in
-                element.children(strict: false) ?? []
+                element.children(strict: false, includeApplicationExtras: element == root) ?? []
             },
             roleProvider: { element in
                 element.role()

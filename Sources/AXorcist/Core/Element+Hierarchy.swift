@@ -19,10 +19,12 @@ extension Element {
     }
 
     @MainActor
-    public func children(strict: Bool = false) -> [Element]? { // Added strict parameter
+    public func children(strict: Bool = false, includeApplicationExtras: Bool = true) -> [Element]? { // Added strict parameter
         // Logging for this top-level call
         // self.briefDescription() is assumed to be refactored and available
-        self.axVerboseDebug("Getting children for element: \(self.briefDescription(option: .smart)), strict: \(strict)")
+        self.axVerboseDebug(
+            "Getting children for element: \(self.briefDescription(option: .smart)), " +
+                "strict: \(strict), includeApplicationExtras: \(includeApplicationExtras)")
 
         var childCollector = ChildCollector() // ChildCollector will use GlobalAXLogger internally
 
@@ -42,13 +44,15 @@ extension Element {
         // window (depth ≈ 37) and never reach hidden/background chat panes.  Fetching `AXWindows` every
         // time is cheap (<10 elements) and guarantees the walker can explore every window even during a
         // brute-force scan.
-        self.collectApplicationWindows(collector: &childCollector)
+        if includeApplicationExtras {
+            self.collectApplicationWindows(collector: &childCollector)
+        }
 
         // Also collect AXFocusedUIElement. This exposes the single element (often a remote renderer proxy)
         // that currently has keyboard/accessibility focus – crucial for Electron/Chromium where the deep
         // subtree is not reachable through normal children. By adding it here the global traversal can
         // discover the focused textarea without requiring special path hinting.
-        if self.role() == AXRoleNames.kAXApplicationRole {
+        if includeApplicationExtras, self.role() == AXRoleNames.kAXApplicationRole {
             if let focusedUI: AXUIElement = attribute(Attribute(AXAttributeNames.kAXFocusedUIElementAttribute)) {
                 self.axVerboseDebug("Added AXFocusedUIElement to children list for application root.")
                 childCollector.addChildren(from: [focusedUI])
@@ -105,29 +109,71 @@ extension Element {
 
     @MainActor
     private func collectAlternativeChildren(collector: inout ChildCollector) {
-        let alternativeAttributes: [String] = [
-            AXAttributeNames.kAXVisibleChildrenAttribute, AXAttributeNames.kAXWebAreaChildrenAttribute,
-            AXAttributeNames.kAXApplicationNavigationAttribute, AXAttributeNames.kAXApplicationElementsAttribute,
-            AXAttributeNames.kAXBodyAreaAttribute, AXAttributeNames.kAXSplitGroupContentsAttribute,
-            AXAttributeNames.kAXLayoutAreaChildrenAttribute, AXAttributeNames.kAXGroupChildrenAttribute,
-            AXAttributeNames.kAXContentsAttribute, "AXChildrenInNavigationOrder",
-            AXAttributeNames.kAXSelectedChildrenAttribute, AXAttributeNames.kAXRowsAttribute,
-            AXAttributeNames.kAXColumnsAttribute, AXAttributeNames.kAXTabsAttribute,
-        ]
         self.axVerboseDebug(
-            "Using pruned attribute list (\(alternativeAttributes.count) items) " +
+            "Using pruned attribute list (\(alternativeChildrenAttributes.count) items) " +
                 "to avoid heavy payloads for alternative children.")
 
-        for attrName in alternativeAttributes {
+        if self.collectChildrenFromAttributes(
+            attributeNames: alternativeChildrenAttributes,
+            collector: &collector)
+        {
+            return
+        }
+
+        for attrName in alternativeChildrenAttributes {
             self.collectChildrenFromAttribute(attributeName: attrName, collector: &collector)
         }
     }
 
     @MainActor
+    private func collectChildrenFromAttributes(
+        attributeNames: [String],
+        collector: inout ChildCollector) -> Bool
+    {
+        guard !attributeNames.isEmpty else { return true }
+
+        let cfAttributes = attributeNames.map { $0 as CFString } as CFArray
+        var values: CFArray?
+
+        let status = AXUIElementCopyMultipleAttributeValues(
+            self.underlyingElement,
+            cfAttributes,
+            AXCopyMultipleAttributeOptions(rawValue: 0),
+            &values)
+
+        guard status == .success, let rawValues = values as? [Any] else {
+            self.axVerboseDebug(
+                "AXUIElementCopyMultipleAttributeValues failed with error: \(status.rawValue). " +
+                    "Falling back to per-attribute lookups.")
+            return false
+        }
+
+        let pairCount = min(attributeNames.count, rawValues.count)
+        if rawValues.count != attributeNames.count {
+            self.axVerboseDebug(
+                "AXUIElementCopyMultipleAttributeValues returned mismatched count. " +
+                    "attributes=\(attributeNames.count), values=\(rawValues.count)")
+        }
+
+        for index in 0..<pairCount {
+            let attrName = attributeNames[index]
+            guard let children = Element.decodeAlternativeChildrenValue(rawValues[index]), !children.isEmpty else {
+                continue
+            }
+
+            self.axVerboseDebug("Batch-fetched \(children.count) children from '\(attrName)'.")
+            collector.addChildren(from: children)
+        }
+
+        return true
+    }
+
+    @MainActor
     private func collectChildrenFromAttribute(attributeName: String, collector: inout ChildCollector) {
         self.axVerboseDebug("Trying alternative child attribute: '\(attributeName)'.")
-        // self.attribute() now uses GlobalAXLogger and returns T?
-        if let childrenUI: [AXUIElement] = attribute(Attribute(attributeName)) {
+        if let rawValue = self.rawAttributeValue(named: attributeName),
+           let childrenUI = Element.decodeAlternativeChildrenValue(rawValue)
+        {
             if !childrenUI.isEmpty {
                 self.axVerboseDebug("Successfully fetched \(childrenUI.count) children from '\(attributeName)'.")
                 collector.addChildren(from: childrenUI)
@@ -158,6 +204,30 @@ extension Element {
             }
         }
     }
+
+    @MainActor
+    static func decodeAlternativeChildrenValue(_ value: Any) -> [AXUIElement]? {
+        func castAXElement(_ candidate: Any) -> AXUIElement? {
+            let cfObject = candidate as AnyObject
+            let cfTypeRef = cfObject as CFTypeRef
+            guard CFGetTypeID(cfTypeRef) == AXUIElementGetTypeID() else {
+                return nil
+            }
+            return unsafeDowncast(cfObject, to: AXUIElement.self)
+        }
+
+        if value is NSNull {
+            return nil
+        }
+        if let values = value as? [Any] {
+            let children = values.compactMap(castAXElement)
+            return children.isEmpty ? nil : children
+        }
+        if let child = castAXElement(value) {
+            return [child]
+        }
+        return nil
+    }
 }
 
 // MARK: - Child Collection Helper
@@ -166,6 +236,15 @@ extension Element {
 /// containers expose thousands of flattened descendants; 50 000 is high enough to reach any realistic
 /// UI while still protecting against infinite recursion / runaway memory.
 private let maxChildrenPerElement = 50000
+private let alternativeChildrenAttributes: [String] = [
+    AXAttributeNames.kAXVisibleChildrenAttribute, AXAttributeNames.kAXWebAreaChildrenAttribute,
+    AXAttributeNames.kAXApplicationNavigationAttribute, AXAttributeNames.kAXApplicationElementsAttribute,
+    AXAttributeNames.kAXBodyAreaAttribute, AXAttributeNames.kAXSplitGroupContentsAttribute,
+    AXAttributeNames.kAXLayoutAreaChildrenAttribute, AXAttributeNames.kAXGroupChildrenAttribute,
+    AXAttributeNames.kAXContentsAttribute, "AXChildrenInNavigationOrder",
+    AXAttributeNames.kAXSelectedChildrenAttribute, AXAttributeNames.kAXRowsAttribute,
+    AXAttributeNames.kAXColumnsAttribute, AXAttributeNames.kAXTabsAttribute,
+]
 
 private struct ChildCollector {
     // MARK: Public
