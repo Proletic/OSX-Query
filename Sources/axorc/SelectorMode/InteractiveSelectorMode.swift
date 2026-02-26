@@ -394,9 +394,6 @@ private final class InteractiveSelectorSession {
         if result.isEnabled == false {
             parts.append("disabled")
         }
-        if let childCount = result.childCount, childCount > 0 {
-            parts.append("children=\(childCount)")
-        }
         return parts.joined(separator: " ")
     }
 

@@ -64,10 +64,6 @@ enum SelectorQueryOutputFormatter {
                 detailParts.append("disabled")
             }
 
-            if let childCount = element.childCount, childCount > 0 {
-                detailParts.append("children=\(childCount)")
-            }
-
             let detailSuffix = detailParts.isEmpty ? "" : " " + detailParts.joined(separator: " ")
             lines.append("[\(index + 1)] \(roleLabel)\(detailSuffix)")
 

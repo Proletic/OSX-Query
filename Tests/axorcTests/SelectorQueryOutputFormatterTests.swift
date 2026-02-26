@@ -76,7 +76,7 @@ struct SelectorQueryOutputFormatterTests {
         #expect(lines[1].contains("desc=\"Save current document\""))
         #expect(lines[1].contains("focused"))
         #expect(lines[1].contains("disabled"))
-        #expect(lines[1].contains("children=3"))
+        #expect(!lines[1].contains("children="))
 
         #expect(lines[2].contains("[2] AXTextField"))
         #expect(lines[2].contains("name=\"Query\""))
