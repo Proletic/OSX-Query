@@ -411,6 +411,12 @@ private final class InteractiveSelectorSession {
         case .backspace:
             self.deleteCharacterBeforeCursor(in: &self.query, cursor: &self.queryCursorIndex)
 
+        case .optionDelete:
+            self.deleteWordBeforeCursor(in: &self.query, cursor: &self.queryCursorIndex)
+
+        case .commandDelete:
+            self.deleteToStartOfLine(in: &self.query, cursor: &self.queryCursorIndex)
+
         case .arrowLeft:
             self.moveCursorLeft(cursor: &self.queryCursorIndex)
 
@@ -516,6 +522,12 @@ private final class InteractiveSelectorSession {
         case .backspace:
             self.deleteCharacterBeforeCursor(in: &self.searchText, cursor: &self.searchCursorIndex)
 
+        case .optionDelete:
+            self.deleteWordBeforeCursor(in: &self.searchText, cursor: &self.searchCursorIndex)
+
+        case .commandDelete:
+            self.deleteToStartOfLine(in: &self.searchText, cursor: &self.searchCursorIndex)
+
         case .arrowLeft:
             self.moveCursorLeft(cursor: &self.searchCursorIndex)
 
@@ -582,6 +594,12 @@ private final class InteractiveSelectorSession {
 
         case .backspace:
             self.deleteCharacterBeforeCursor(in: &self.pendingValueText, cursor: &self.pendingValueCursorIndex)
+
+        case .optionDelete:
+            self.deleteWordBeforeCursor(in: &self.pendingValueText, cursor: &self.pendingValueCursorIndex)
+
+        case .commandDelete:
+            self.deleteToStartOfLine(in: &self.pendingValueText, cursor: &self.pendingValueCursorIndex)
 
         case .arrowLeft:
             self.moveCursorLeft(cursor: &self.pendingValueCursorIndex)
@@ -759,6 +777,39 @@ private final class InteractiveSelectorSession {
         cursor = boundedCursor - 1
     }
 
+    private func deleteWordBeforeCursor(in text: inout String, cursor: inout Int) {
+        let characters = Array(text)
+        let end = max(0, min(cursor, characters.count))
+        guard end > 0 else {
+            cursor = 0
+            return
+        }
+
+        var start = end
+        while start > 0, characters[start - 1].isWhitespaceLike {
+            start -= 1
+        }
+        while start > 0, !characters[start - 1].isWhitespaceLike {
+            start -= 1
+        }
+
+        let deleteStart = text.index(text.startIndex, offsetBy: start)
+        let deleteEnd = text.index(text.startIndex, offsetBy: end)
+        text.removeSubrange(deleteStart..<deleteEnd)
+        cursor = start
+    }
+
+    private func deleteToStartOfLine(in text: inout String, cursor: inout Int) {
+        let end = max(0, min(cursor, text.count))
+        guard end > 0 else {
+            cursor = 0
+            return
+        }
+        let deleteEnd = text.index(text.startIndex, offsetBy: end)
+        text.removeSubrange(text.startIndex..<deleteEnd)
+        cursor = 0
+    }
+
     private func moveCursorLeft(cursor: inout Int) {
         cursor = max(0, cursor - 1)
     }
@@ -828,6 +879,9 @@ private final class InteractiveSelectorSession {
         switch firstByte {
         case 3:
             return .ctrlC
+        case 21:
+            // Common mapping for Cmd+Delete / kill-to-beginning-of-line in terminals.
+            return .commandDelete
         case 6:
             return .ctrlF
         case 2:
@@ -857,6 +911,9 @@ private final class InteractiveSelectorSession {
         }
         if secondByte == 102 || secondByte == 70 {
             return .altArrowRight
+        }
+        if secondByte == 127 || secondByte == 8 {
+            return .optionDelete
         }
 
         guard secondByte == 91 else {
@@ -905,6 +962,12 @@ private final class InteractiveSelectorSession {
             {
                 return .altArrowRight
             }
+            if sequence.contains(";3"), sequence.hasSuffix("~") {
+                return .optionDelete
+            }
+            if sequence.contains(";9"), sequence.hasSuffix("~") {
+                return .commandDelete
+            }
             return .unknown
         }
     }
@@ -928,6 +991,8 @@ private enum TerminalKey: Equatable {
     case character(Character)
     case enter
     case backspace
+    case optionDelete
+    case commandDelete
     case escape
     case arrowLeft
     case arrowRight
