@@ -298,6 +298,18 @@ struct OXQSelectorEngineTests {
         #expect(fixture.ids(matches) == ["buttonSave", "buttonCancel"])
     }
 
+    @Test("supports computed name alias mapping via CPName")
+    func supportsComputedNameAliasMappingViaCPName() throws {
+        let fixture = FakeTreeFixture()
+        let engine = fixture.makeEngine()
+
+        let matches = try engine.findAll(
+            matching: #"*[CPName*="ave"]"#,
+            from: fixture.root,
+            maxDepth: 10)
+        #expect(fixture.ids(matches) == ["buttonSave"])
+    }
+
     @Test("handles negative max depth as zero")
     func handlesNegativeMaxDepth() throws {
         let fixture = FakeTreeFixture()
@@ -492,8 +504,8 @@ private struct FakeTreeFixture {
         "staticChild": ["AXValue": "Child"],
         "textAreaA": ["AXValue": "test draft"],
         "textAreaB": ["AXValue": "notes"],
-        "buttonSave": ["AXTitle": "Save"],
-        "buttonCancel": ["AXTitle": "Cancel"],
+        "buttonSave": ["AXTitle": "Save", AXMiscConstants.computedNameAttributeKey: "Save"],
+        "buttonCancel": ["AXTitle": "Cancel", AXMiscConstants.computedNameAttributeKey: "Cancel"],
         "textFieldA": ["AXValue": "Ralph"],
     ]
 

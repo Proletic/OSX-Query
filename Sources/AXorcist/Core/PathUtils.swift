@@ -16,6 +16,7 @@ public enum PathUtils {
         "placeholder": AXAttributeNames.kAXPlaceholderValueAttribute,
         "enabled": AXAttributeNames.kAXEnabledAttribute,
         "focused": AXAttributeNames.kAXFocusedAttribute,
+        "cpname": AXMiscConstants.computedNameAttributeKey,
     ]
 
     public static func parsePathComponent(_ pathComponent: String) -> (attributeName: String, expectedValue: String) {
