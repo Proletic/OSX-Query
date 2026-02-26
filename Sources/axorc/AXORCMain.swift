@@ -58,6 +58,11 @@ struct AXORCCommand: ParsableCommand {
     @Option(name: .long, help: "OXQ selector query for selector mode.")
     var selector: String?
 
+    @Flag(
+        names: [.customShort("i", allowingJoined: false), .customLong("interactive")],
+        help: "Open interactive selector mode (full-screen query and result navigation).")
+    var interactive: Bool = false
+
     @Option(name: .customLong("max-depth"), help: "Selector mode max traversal depth (default unlimited).")
     var selectorMaxDepth: Int?
 
@@ -219,6 +224,11 @@ struct AXORCCommand: ParsableCommand {
             return
         }
 
+        if let interactiveRequest = try self.buildInteractiveSelectorRequestIfNeeded() {
+            try self.runInteractiveSelectorMode(request: interactiveRequest)
+            return
+        }
+
         if let selectorRequest = try self.buildSelectorRequestIfNeeded() {
             try self.runSelectorMode(request: selectorRequest)
             return
@@ -318,7 +328,7 @@ struct AXORCCommand: ParsableCommand {
         let hasSelector = !(self.selector?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         return hasApp || hasSelector || self.selectorMaxDepth != nil || self.limit != nil || self.noColor ||
             self.showPath || self.showNameSource || self.selectorResultIndex != nil || self.interaction != nil ||
-            self.interactionValue != nil || self.submitAfterSetValue
+            self.interactionValue != nil || self.submitAfterSetValue || self.interactive
     }
 
     private mutating func buildAXExposureRequestIfNeeded() throws -> AXExposureRequest? {
@@ -342,6 +352,40 @@ struct AXORCCommand: ParsableCommand {
         } catch let exposureError as AXExposureCLIError {
             throw ValidationError(exposureError.localizedDescription)
         }
+    }
+
+    private mutating func buildInteractiveSelectorRequestIfNeeded() throws -> InteractiveSelectorRequest? {
+        let interactiveRequested = self.interactive || self.consumeInteractiveSelectorShortcut()
+        do {
+            return try InteractiveSelectorRequestBuilder.build(
+                app: self.app,
+                selector: self.selector,
+                maxDepth: self.selectorMaxDepth,
+                interactive: interactiveRequested,
+                hasStructuredInput: self.hasAnyStructuredInput())
+        } catch let interactiveError as InteractiveSelectorCLIError {
+            throw ValidationError(interactiveError.localizedDescription)
+        }
+    }
+
+    private mutating func runInteractiveSelectorMode(request: InteractiveSelectorRequest) throws {
+        do {
+            try InteractiveSelectorRunner.run(request: request)
+            axClearLogs()
+        } catch let interactiveError as InteractiveSelectorCLIError {
+            throw ValidationError(interactiveError.localizedDescription)
+        }
+    }
+
+    private mutating func consumeInteractiveSelectorShortcut() -> Bool {
+        guard let selectorValue = self.selector?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        guard selectorValue == "-i" || selectorValue == "--interactive" else {
+            return false
+        }
+        self.selector = nil
+        return true
     }
 
     private mutating func buildSelectorRequestIfNeeded() throws -> SelectorQueryRequest? {
@@ -453,7 +497,32 @@ extension AXORCCommand {
         let signature = CommandSignature.describe(prototype)
         let parser = CommandParser(signature: signature)
         let rawArguments = Array(CommandLine.arguments.dropFirst())
-        return try parser.parse(arguments: rawArguments)
+        let normalizedArguments = Self.normalizeArguments(rawArguments)
+        return try parser.parse(arguments: normalizedArguments)
+    }
+
+    private static func normalizeArguments(_ arguments: [String]) -> [String] {
+        guard !arguments.isEmpty else { return arguments }
+
+        var normalized: [String] = []
+        normalized.reserveCapacity(arguments.count)
+
+        var index = 0
+        while index < arguments.count {
+            if arguments[index] == "--selector",
+               index + 1 < arguments.count,
+               arguments[index + 1] == "-i"
+            {
+                // Allow shorthand flow: --selector -i
+                index += 1
+                continue
+            }
+
+            normalized.append(arguments[index])
+            index += 1
+        }
+
+        return normalized
     }
 
     private mutating func apply(parsedValues: ParsedValues) throws {
@@ -465,6 +534,7 @@ extension AXORCCommand {
         self.noColor = parsedValues.flags.contains("noColor")
         self.showPath = parsedValues.flags.contains("showPath")
         self.showNameSource = parsedValues.flags.contains("showNameSource")
+        self.interactive = parsedValues.flags.contains("interactive")
         self.submitAfterSetValue = parsedValues.flags.contains("submitAfterSetValue")
 
         if let fileValue = parsedValues.options["file"]?.last {
