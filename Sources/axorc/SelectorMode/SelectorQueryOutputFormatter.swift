@@ -29,20 +29,22 @@ enum SelectorQueryOutputFormatter {
             let roleLabel = colorizer.colorizeRole(element.role)
             var detailParts: [String] = []
 
-            if let computedName = self.detailValue(element.computedName) {
+            if let computedName = self.detailValue(element.resultDisplayName) {
                 detailParts.append("name=\"\(self.sanitize(computedName))\"")
-                if report.request.showNameSource, let computedNameSource = self.detailValue(element.computedNameSource) {
+                if report.request.showNameSource, let computedNameSource = self.detailValue(element.resultDisplayNameSource) {
                     detailParts.append("name_source=\"\(self.sanitize(computedNameSource))\"")
                 }
             }
 
             if let title = self.detailValue(element.title) {
-                if title != element.computedName {
+                let isStaticTextValueName = element.role == "AXStaticText" &&
+                    self.detailValue(element.value) != nil
+                if !isStaticTextValueName && title != element.resultDisplayName {
                     detailParts.append("title=\"\(self.sanitize(title))\"")
                 }
             }
 
-            if let value = self.detailValue(element.value) {
+            if let value = self.detailValue(element.resultDisplayValue) {
                 detailParts.append("value=\"\(self.sanitize(value))\"")
             }
 

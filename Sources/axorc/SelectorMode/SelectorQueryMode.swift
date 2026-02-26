@@ -319,6 +319,28 @@ struct SelectorMatchSummary: Equatable {
     let descriptionText: String?
     let path: String?
 
+    var resultDisplayName: String? {
+        if self.role == AXRoleNames.kAXStaticTextRole, let value = self.value {
+            return value
+        }
+        return self.computedName
+    }
+
+    var resultDisplayNameSource: String? {
+        if self.role == AXRoleNames.kAXStaticTextRole, let value = self.value {
+            if value != self.computedName {
+                return AXAttributeNames.kAXValueAttribute
+            }
+        }
+        return self.computedNameSource
+    }
+
+    var resultDisplayValue: String? {
+        guard let value = self.value else { return nil }
+        guard value != self.resultDisplayName else { return nil }
+        return value
+    }
+
     init(
         role: String,
         computedName: String?,

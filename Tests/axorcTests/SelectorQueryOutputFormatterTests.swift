@@ -264,6 +264,42 @@ struct SelectorQueryOutputFormatterTests {
         #expect(outputWithSource.contains("name_source=\"AXTitle\""))
     }
 
+    @Test("Prefers static text value as name and omits duplicate value detail")
+    func prefersStaticTextValueAsName() {
+        let request = SelectorQueryRequest(
+            appIdentifier: "com.apple.TextEdit",
+            selector: "AXStaticText",
+            maxDepth: 10,
+            limit: 10,
+            colorEnabled: false,
+            showPath: false,
+            showNameSource: true)
+
+        let report = SelectorQueryExecutionReport(
+            request: request,
+            elapsedMilliseconds: 1,
+            traversedCount: 1,
+            matchedCount: 1,
+            shownCount: 1,
+            results: [
+                SelectorMatchSummary(
+                    role: "AXStaticText",
+                    computedName: "Fallback title",
+                    computedNameSource: "AXTitle",
+                    title: "Fallback title",
+                    value: "Actual static text value",
+                    identifier: nil,
+                    descriptionText: nil,
+                    path: nil),
+            ])
+
+        let output = SelectorQueryOutputFormatter.format(report: report)
+        #expect(output.contains("name=\"Actual static text value\""))
+        #expect(output.contains("name_source=\"AXValue\""))
+        #expect(!output.contains("value=\"Actual static text value\""))
+        #expect(!output.contains("title=\"Fallback title\""))
+    }
+
     @Test("Shows interaction status line when action was executed")
     func showsInteractionStatusLine() {
         let request = SelectorQueryRequest(

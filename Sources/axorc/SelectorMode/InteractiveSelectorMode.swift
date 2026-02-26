@@ -376,10 +376,10 @@ private final class InteractiveSelectorSession {
 
     private func renderedResultLine(_ result: SelectorMatchSummary) -> String {
         var parts: [String] = [result.role]
-        if let name = self.detailValue(result.computedName) {
+        if let name = self.detailValue(result.resultDisplayName) {
             parts.append("name=\"\(name)\"")
         }
-        if let value = self.detailValue(result.value) {
+        if let value = self.detailValue(result.resultDisplayValue) {
             parts.append("value=\"\(value)\"")
         }
         if let descriptionText = self.detailValue(result.descriptionText) {
