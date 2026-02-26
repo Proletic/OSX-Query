@@ -611,7 +611,6 @@ echo '{
 - **AXorcist** - Main orchestrator class
 - **Element** - Wrapper around AXUIElement with convenience methods
 - **ElementSearch** - Tree traversal and matching engine
-- **AXElementMatcher** - Criteria matching logic
 - **PathNavigator** - Hierarchical navigation
 - **AXObserverCenter** - Notification management
 
