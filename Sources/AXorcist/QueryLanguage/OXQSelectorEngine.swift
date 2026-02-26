@@ -21,48 +21,62 @@ public final class OXQSelectorEngine<Node: Hashable> {
     public func findAll(
         matching query: String,
         from root: Node,
-        maxDepth: Int = AXMiscConstants.defaultMaxDepthSearch) throws -> [Node]
+        maxDepth: Int = AXMiscConstants.defaultMaxDepthSearch,
+        memoizationContext: OXQQueryMemoizationContext<Node>? = nil) throws -> [Node]
     {
         let syntaxTree = try self.parser.parse(query)
         return self.findAll(
             matching: syntaxTree,
             from: root,
-            maxDepth: maxDepth)
+            maxDepth: maxDepth,
+            memoizationContext: memoizationContext)
     }
 
     public func findFirst(
         matching query: String,
         from root: Node,
-        maxDepth: Int = AXMiscConstants.defaultMaxDepthSearch) throws -> Node?
+        maxDepth: Int = AXMiscConstants.defaultMaxDepthSearch,
+        memoizationContext: OXQQueryMemoizationContext<Node>? = nil) throws -> Node?
     {
-        try self.findAll(matching: query, from: root, maxDepth: maxDepth).first
+        try self.findAll(
+            matching: query,
+            from: root,
+            maxDepth: maxDepth,
+            memoizationContext: memoizationContext).first
     }
 
     public func findAll(
         matching syntaxTree: OXQSyntaxTree,
         from root: Node,
-        maxDepth: Int = AXMiscConstants.defaultMaxDepthSearch) -> [Node]
+        maxDepth: Int = AXMiscConstants.defaultMaxDepthSearch,
+        memoizationContext: OXQQueryMemoizationContext<Node>? = nil) -> [Node]
     {
         let safeMaxDepth = max(0, maxDepth)
+        let memoization = memoizationContext ?? self.makeMemoizationContext()
         let indexedTree = OXQIndexedTree(
             root: root,
             maxDepth: safeMaxDepth,
-            childrenProvider: self.childrenProvider,
-            roleProvider: self.roleProvider)
+            childrenProvider: { memoization.children(of: $0) },
+            roleProvider: { memoization.role(of: $0) })
         var evaluator = OXQEvaluator(
             syntaxTree: syntaxTree,
             indexedTree: indexedTree,
-            roleProvider: self.roleProvider,
-            attributeValueProvider: self.attributeValueProvider)
+            roleProvider: { memoization.role(of: $0) },
+            attributeValueProvider: { memoization.attributeValue(of: $0, attributeName: $1) })
         return evaluator.evaluateAll()
     }
 
     public func findFirst(
         matching syntaxTree: OXQSyntaxTree,
         from root: Node,
-        maxDepth: Int = AXMiscConstants.defaultMaxDepthSearch) -> Node?
+        maxDepth: Int = AXMiscConstants.defaultMaxDepthSearch,
+        memoizationContext: OXQQueryMemoizationContext<Node>? = nil) -> Node?
     {
-        self.findAll(matching: syntaxTree, from: root, maxDepth: maxDepth).first
+        self.findAll(
+            matching: syntaxTree,
+            from: root,
+            maxDepth: maxDepth,
+            memoizationContext: memoizationContext).first
     }
 
     // MARK: Private
@@ -71,6 +85,13 @@ public final class OXQSelectorEngine<Node: Hashable> {
     private let childrenProvider: (Node) -> [Node]
     private let roleProvider: (Node) -> String?
     private let attributeValueProvider: (Node, String) -> String?
+
+    private func makeMemoizationContext() -> OXQQueryMemoizationContext<Node> {
+        OXQQueryMemoizationContext<Node>(
+            childrenProvider: self.childrenProvider,
+            roleProvider: self.roleProvider,
+            attributeValueProvider: self.attributeValueProvider)
+    }
 }
 
 private struct OXQIndexedTree<Node: Hashable> {

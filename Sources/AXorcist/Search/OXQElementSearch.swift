@@ -25,10 +25,22 @@ struct OXQElementSearch {
         from root: Element,
         maxDepth: Int) throws -> Element?
     {
-        try self.engine.findFirst(
+        let memoizationContext = OXQQueryMemoizationContext<Element>(
+            childrenProvider: { element in
+                element.children(strict: false) ?? []
+            },
+            roleProvider: { element in
+                element.role()
+            },
+            attributeValueProvider: { element, attributeName in
+                OXQElementSearch.stringValue(for: element, attributeName: attributeName)
+            })
+
+        return try self.engine.findFirst(
             matching: selectorQuery,
             from: root,
-            maxDepth: maxDepth)
+            maxDepth: maxDepth,
+            memoizationContext: memoizationContext)
     }
 
     // MARK: Private

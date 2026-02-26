@@ -275,6 +275,42 @@ struct OXQSelectorEngineTests {
         let matches = try engine.findAll(matching: "*", from: root, maxDepth: 10)
         #expect(matches.map(\.id) == ["rootCycle", "a", "b"])
     }
+
+    @Test("memoization avoids repeated attribute reads inside a single query")
+    func memoizationAvoidsRepeatedAttributeReadsWithinQuery() throws {
+        let fixture = FakeTreeFixture()
+        let probe = AttributeProbe()
+        let engine = fixture.makeEngine(probe: probe)
+
+        let matches = try engine.findAll(
+            matching: #"AXStaticText[AXTitle*="Spotify", AXTitle$="Song"]"#,
+            from: fixture.root,
+            maxDepth: 10)
+
+        #expect(fixture.ids(matches) == ["staticA"])
+        #expect(probe.totalReads["AXTitle"] == 4)
+    }
+
+    @Test("memoization is short-lived and does not persist between queries")
+    func memoizationIsShortLivedAcrossQueries() throws {
+        let fixture = FakeTreeFixture()
+        let probe = AttributeProbe()
+        let engine = fixture.makeEngine(probe: probe)
+
+        _ = try engine.findAll(
+            matching: #"AXStaticText[AXValue*=""]"#,
+            from: fixture.root,
+            maxDepth: 10)
+        let firstReadCount = probe.totalReads["AXValue"] ?? 0
+        #expect(firstReadCount == 4)
+
+        _ = try engine.findAll(
+            matching: #"AXStaticText[AXValue*=""]"#,
+            from: fixture.root,
+            maxDepth: 10)
+        let secondReadCount = probe.totalReads["AXValue"] ?? 0
+        #expect(secondReadCount == 8)
+    }
 }
 
 private struct FakeNode: Hashable, Sendable {
