@@ -89,9 +89,23 @@ public func findTargetElement(
     currentSearchElement = pathResult.element
     searchStartingPointDescription = pathResult.description ?? searchStartingPointDescription
 
+    if hasSelectorQuery(locator) {
+        if !locator.criteria.isEmpty {
+            logger.warning(
+                logSegments(
+                    "FTE: Both selector and criteria provided; using selector and ignoring criteria.",
+                    "Criteria count=\(locator.criteria.count)"))
+        }
+        return applySelectorSearch(
+            startElement: currentSearchElement,
+            locator: locator,
+            maxDepthForSearch: maxDepthForSearch,
+            searchStartingPointDescription: searchStartingPointDescription)
+    }
+
     if locator.criteria.isEmpty {
         if locator.rootElementPathHint?.isEmpty ?? true {
-            let noCriteriaError = "FTE: No criteria, no path hint"
+            let noCriteriaError = "FTE: No selector, no criteria, no path hint"
             logger.error("\(noCriteriaError)")
             return (nil, noCriteriaError)
         }
@@ -217,27 +231,92 @@ private func applyCriteriaSearch(
     return (nil, finalSearchError)
 }
 
+@MainActor
+private func applySelectorSearch(
+    startElement: Element,
+    locator: Locator,
+    maxDepthForSearch: Int,
+    searchStartingPointDescription: String) -> (element: Element?, error: String?)
+{
+    guard let selectorQuery = locator.selector?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !selectorQuery.isEmpty
+    else {
+        let error = "FTE: Selector search requested but selector query is empty."
+        logger.error(error)
+        return (nil, error)
+    }
+
+    logger.debug(
+        logSegments(
+            "FTE: Apply OXQ selector from \(searchStartingPointDescription)",
+            "Selector='\(selectorQuery)'",
+            "Depth=\(maxDepthForSearch)"))
+
+    let searchEngine = OXQElementSearch()
+    do {
+        if let match = try searchEngine.findFirst(
+            matching: selectorQuery,
+            from: startElement,
+            maxDepth: maxDepthForSearch)
+        {
+            logger.info(
+                logSegments(
+                    "FTE: Selector matched -> \(match.briefDescription(option: .smart))"))
+            return (match, nil)
+        }
+
+        let noMatchError = logSegments(
+            "FTE: Selector matched no elements",
+            "Selector='\(selectorQuery)'",
+            "From \(searchStartingPointDescription)")
+        logger.warning(noMatchError)
+        return (nil, noMatchError)
+    } catch let parseError as OXQParseError {
+        let parseMessage = logSegments(
+            "FTE: Invalid selector query",
+            "'\(selectorQuery)'",
+            "Error: \(parseError.description)")
+        logger.error(parseMessage)
+        return (nil, parseMessage)
+    } catch {
+        let errorMessage = logSegments(
+            "FTE: Selector search failed",
+            "Selector='\(selectorQuery)'",
+            "Error: \(error.localizedDescription)")
+        logger.error(errorMessage)
+        return (nil, errorMessage)
+    }
+}
+
 private func logFindTargetSetup(
     appIdentifier: String,
     locator: Locator,
-    maxDepth: Int) -> (pathHint: String, criteria: String)
+    maxDepth: Int) -> (pathHint: String, criteria: String, selector: String)
 {
     let pathHint = locator.rootElementPathHint?
         .map { $0.descriptionForLog() }
         .joined(separator: "\n    -> ") ?? "nil"
     let criteria = describeCriteria(locator.criteria)
+    let selector = locator.selector?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let selectorForLog = selector.isEmpty ? "none" : selector
     logger.info(
         logSegments(
             "FTE: App='\(appIdentifier)'",
             "D=\(maxDepth)",
             "C=\(criteria)",
+            "S=\(selectorForLog)",
             "PH=\(locator.rootElementPathHint?.count ?? 0)"))
-    return (pathHint, criteria)
+    return (pathHint, criteria, selectorForLog)
 }
 
 private func resetTraversalState() {
     traversalNodeCounter = 0
     traversalDeadline = Date().addingTimeInterval(axorcTraversalTimeout)
+}
+
+private func hasSelectorQuery(_ locator: Locator) -> Bool {
+    guard let selector = locator.selector else { return false }
+    return !selector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
 
 // MARK: - Element Collection Logic

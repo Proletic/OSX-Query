@@ -106,6 +106,7 @@ public struct Locator: Codable, Sendable {
     public init(
         matchAll: Bool? = true, // Default to true for criteria
         criteria: [Criterion] = [],
+        selector: String? = nil,
         rootElementPathHint: [JSONPathHintComponent]? = nil, // Changed from [PathStep]?
         descendantCriteria: [String: String]? = nil,
         requireAction: String? = nil,
@@ -114,6 +115,7 @@ public struct Locator: Codable, Sendable {
     {
         self.matchAll = matchAll
         self.criteria = criteria
+        self.selector = selector
         self.rootElementPathHint = rootElementPathHint
         self.descendantCriteria = descendantCriteria
         self.requireAction = requireAction
@@ -125,6 +127,7 @@ public struct Locator: Codable, Sendable {
 
     public var matchAll: Bool? // For the top-level criteria, if path_from_root is not used or fails early.
     public var criteria: [Criterion]
+    public var selector: String?
     public var rootElementPathHint: [JSONPathHintComponent]? // Changed from [PathStep]?
     public var descendantCriteria: [String: String]? // This seems to be an older/alternative way? Consider phasing out
     // or clarifying.
@@ -137,6 +140,7 @@ public struct Locator: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case matchAll
         case criteria
+        case selector
         case rootElementPathHint = "path_from_root" // Map to JSON key "path_from_root"
         case descendantCriteria
         case requireAction

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct OXQSyntaxTree: Equatable, Sendable {
+public struct OXQSyntaxTree: Equatable, Hashable, Sendable {
     public init(selectors: [OXQSelector]) {
         self.selectors = selectors
     }
@@ -8,7 +8,7 @@ public struct OXQSyntaxTree: Equatable, Sendable {
     public let selectors: [OXQSelector]
 }
 
-public struct OXQSelector: Equatable, Sendable {
+public struct OXQSelector: Equatable, Hashable, Sendable {
     public init(leading: OXQCompound, links: [OXQSelectorLink]) {
         self.leading = leading
         self.links = links
@@ -18,7 +18,7 @@ public struct OXQSelector: Equatable, Sendable {
     public let links: [OXQSelectorLink]
 }
 
-public struct OXQSelectorLink: Equatable, Sendable {
+public struct OXQSelectorLink: Equatable, Hashable, Sendable {
     public init(combinator: OXQCombinator, compound: OXQCompound) {
         self.combinator = combinator
         self.compound = compound
@@ -28,12 +28,12 @@ public struct OXQSelectorLink: Equatable, Sendable {
     public let compound: OXQCompound
 }
 
-public enum OXQCombinator: String, Equatable, Sendable {
+public enum OXQCombinator: String, Equatable, Hashable, Sendable {
     case child = ">"
     case descendant = " "
 }
 
-public struct OXQCompound: Equatable, Sendable {
+public struct OXQCompound: Equatable, Hashable, Sendable {
     public init(typeSelector: OXQTypeSelector?, attributes: [OXQAttributeMatch], pseudos: [OXQPseudoClass]) {
         self.typeSelector = typeSelector
         self.attributes = attributes
@@ -45,12 +45,12 @@ public struct OXQCompound: Equatable, Sendable {
     public let pseudos: [OXQPseudoClass]
 }
 
-public enum OXQTypeSelector: Equatable, Sendable {
+public enum OXQTypeSelector: Equatable, Hashable, Sendable {
     case wildcard
     case role(String)
 }
 
-public struct OXQAttributeMatch: Equatable, Sendable {
+public struct OXQAttributeMatch: Equatable, Hashable, Sendable {
     public init(name: String, op: OXQAttributeOperator, value: String) {
         self.name = name
         self.op = op
@@ -62,24 +62,24 @@ public struct OXQAttributeMatch: Equatable, Sendable {
     public let value: String
 }
 
-public enum OXQAttributeOperator: String, Equatable, Sendable {
+public enum OXQAttributeOperator: String, Equatable, Hashable, Sendable {
     case equals = "="
     case contains = "*="
     case startsWith = "^="
     case endsWith = "$="
 }
 
-public enum OXQPseudoClass: Equatable, Sendable {
+public enum OXQPseudoClass: Equatable, Hashable, Sendable {
     case has(argument: OXQHasArgument)
     case not(selectors: [OXQSelector])
 }
 
-public enum OXQHasArgument: Equatable, Sendable {
+public enum OXQHasArgument: Equatable, Hashable, Sendable {
     case selectors([OXQSelector])
     case relativeSelectors([OXQRelativeSelector])
 }
 
-public struct OXQRelativeSelector: Equatable, Sendable {
+public struct OXQRelativeSelector: Equatable, Hashable, Sendable {
     public init(leadingCombinator: OXQCombinator?, selector: OXQSelector) {
         self.leadingCombinator = leadingCombinator
         self.selector = selector

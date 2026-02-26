@@ -35,6 +35,7 @@ extension CommandType {
             locator: Locator(
                 matchAll: effectiveLocator.matchAll,
                 criteria: effectiveLocator.criteria,
+                selector: effectiveLocator.selector,
                 rootElementPathHint: effectiveLocator.rootElementPathHint,
                 descendantCriteria: effectiveLocator.descendantCriteria,
                 requireAction: effectiveLocator.requireAction,
