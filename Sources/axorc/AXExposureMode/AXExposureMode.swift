@@ -185,7 +185,7 @@ struct AXExposureRunner {
     private func waitUntilFrontmost(pid: pid_t, bundleIdentifier: String, timeout: TimeInterval) throws {
         let deadline = self.now().addingTimeInterval(timeout)
         while self.now() < deadline {
-            if self.frontmostProvider()?.pid == pid {
+            if self.isFrontmostTarget(pid: pid, bundleIdentifier: bundleIdentifier) {
                 return
             }
             self.sleep(0.05)
@@ -245,6 +245,15 @@ struct AXExposureRunner {
             element,
             attribute as CFString,
             CFConstants.cfBoolean(from: value))
+    }
+
+    private func isFrontmostTarget(pid: pid_t, bundleIdentifier: String) -> Bool {
+        guard let frontmost = self.frontmostProvider() else { return false }
+        if frontmost.pid == pid {
+            return true
+        }
+
+        return frontmost.bundleIdentifier.caseInsensitiveCompare(bundleIdentifier) == .orderedSame
     }
 }
 

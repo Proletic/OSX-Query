@@ -140,6 +140,37 @@ struct AXExposureRunnerTests {
             Issue.record("Unexpected error: \(error)")
         }
     }
+
+    @Test("Accepts frontmost bundle match when PID differs")
+    func acceptsFrontmostBundleMatchWhenPidDiffers() throws {
+        let original = AXExposureApp(pid: 11, bundleIdentifier: "com.example.original", isTerminated: false)
+        let target = AXExposureApp(pid: 22, bundleIdentifier: "com.example.target", isTerminated: false)
+        let targetHelperFrontmost = AXExposureApp(pid: 33, bundleIdentifier: "com.example.target", isTerminated: false)
+        let state = MutableState(frontmost: original)
+
+        let runner = AXExposureRunner(
+            runningAppLookup: { _ in target },
+            frontmostProvider: { state.frontmost },
+            activatePid: { pid in
+                state.activationPids.append(pid)
+                if pid == target.pid {
+                    state.frontmost = targetHelperFrontmost
+                } else if pid == original.pid {
+                    state.frontmost = original
+                }
+                return true
+            },
+            now: { state.now },
+            sleep: { seconds in state.now.addTimeInterval(seconds) },
+            boolReader: { _, _ in nil },
+            boolWriter: { _, _, _ in .success })
+
+        let report = try runner.execute(
+            AXExposureRequest(bundleIdentifier: target.bundleIdentifier, focusTimeoutSeconds: 0.2))
+
+        #expect(report.restoredOriginalFocus == true)
+        #expect(state.activationPids == [target.pid, original.pid])
+    }
 }
 
 private final class MutableState {
