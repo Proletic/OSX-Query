@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import AXorcist
+import AppKit
 
 enum InteractiveSelectorCLIError: LocalizedError, Equatable {
     case missingApplication
@@ -26,6 +27,7 @@ struct InteractiveSelectorRequest: Equatable {
     let appIdentifier: String
     let initialSelector: String?
     let maxDepth: Int
+    let refocusTerminalAfterInteractions: Bool
 }
 
 enum InteractiveSelectorRequestBuilder {
@@ -36,6 +38,7 @@ enum InteractiveSelectorRequestBuilder {
         selector: String?,
         maxDepth: Int?,
         interactive: Bool,
+        refocusTerminalAfterInteractions: Bool = false,
         hasStructuredInput: Bool) throws -> InteractiveSelectorRequest?
     {
         guard interactive else { return nil }
@@ -59,7 +62,8 @@ enum InteractiveSelectorRequestBuilder {
         return InteractiveSelectorRequest(
             appIdentifier: trimmedApp,
             initialSelector: initialSelector,
-            maxDepth: maxDepth ?? unlimitedMaxDepth)
+            maxDepth: maxDepth ?? unlimitedMaxDepth,
+            refocusTerminalAfterInteractions: refocusTerminalAfterInteractions)
     }
 }
 
@@ -103,6 +107,7 @@ private final class InteractiveSelectorSession {
     private let runner = SelectorQueryRunner()
     private let colorEnabled: Bool
     private let roleColorizer: InteractiveRoleColorizer
+    private let terminalAppPID: pid_t?
     private var rawMode: RawTerminalMode
 
     private var mode: Mode = .query
@@ -130,6 +135,7 @@ private final class InteractiveSelectorSession {
         self.queryCursorIndex = self.query.count
         self.colorEnabled = OutputCapabilities.stdoutSupportsANSI
         self.roleColorizer = InteractiveRoleColorizer(enabled: OutputCapabilities.stdoutSupportsANSI)
+        self.terminalAppPID = request.refocusTerminalAfterInteractions ? NSWorkspace.shared.frontmostApplication?.processIdentifier : nil
         self.rawMode = try RawTerminalMode(fd: STDIN_FILENO)
     }
 
@@ -215,6 +221,13 @@ private final class InteractiveSelectorSession {
             showNameSource: false,
             interaction: SelectorInteractionRequest(resultIndex: self.selectedIndex + 1, action: action))
 
+        let shouldRefocusTerminal = self.shouldRefocusTerminal(after: action)
+        defer {
+            if shouldRefocusTerminal {
+                self.refocusTerminalApp()
+            }
+        }
+
         do {
             let report = try self.runner.execute(request)
             self.lastReport = report
@@ -230,6 +243,24 @@ private final class InteractiveSelectorSession {
         }
 
         self.mode = .results
+    }
+
+    private func shouldRefocusTerminal(after action: SelectorInteractionAction) -> Bool {
+        guard self.request.refocusTerminalAfterInteractions else { return false }
+        switch action {
+        case .click, .focus, .setValueAndSubmit:
+            return true
+        case .press, .setValue:
+            return false
+        }
+    }
+
+    private func refocusTerminalApp() {
+        guard let terminalAppPID else { return }
+        guard let terminalApp = NSRunningApplication(processIdentifier: terminalAppPID), !terminalApp.isTerminated else {
+            return
+        }
+        _ = terminalApp.activate(options: [])
     }
 
     private func render() {

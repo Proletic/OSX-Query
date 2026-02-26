@@ -63,6 +63,11 @@ struct AXORCCommand: ParsableCommand {
         help: "Open interactive selector mode (full-screen query and result navigation).")
     var interactive: Bool = false
 
+    @Flag(
+        names: [.customShort("r", allowingJoined: false), .customLong("refocus-terminal")],
+        help: "With -i, refocus the terminal app after click/focus/set-value-submit interactions.")
+    var refocusTerminal: Bool = false
+
     @Option(name: .customLong("max-depth"), help: "Selector mode max traversal depth (default unlimited).")
     var selectorMaxDepth: Int?
 
@@ -328,7 +333,7 @@ struct AXORCCommand: ParsableCommand {
         let hasSelector = !(self.selector?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         return hasApp || hasSelector || self.selectorMaxDepth != nil || self.limit != nil || self.noColor ||
             self.showPath || self.showNameSource || self.selectorResultIndex != nil || self.interaction != nil ||
-            self.interactionValue != nil || self.submitAfterSetValue || self.interactive
+            self.interactionValue != nil || self.submitAfterSetValue || self.interactive || self.refocusTerminal
     }
 
     private mutating func buildAXExposureRequestIfNeeded() throws -> AXExposureRequest? {
@@ -362,6 +367,7 @@ struct AXORCCommand: ParsableCommand {
                 selector: self.selector,
                 maxDepth: self.selectorMaxDepth,
                 interactive: interactiveRequested,
+                refocusTerminalAfterInteractions: self.refocusTerminal,
                 hasStructuredInput: self.hasAnyStructuredInput())
         } catch let interactiveError as InteractiveSelectorCLIError {
             throw ValidationError(interactiveError.localizedDescription)
@@ -535,6 +541,7 @@ extension AXORCCommand {
         self.showPath = parsedValues.flags.contains("showPath")
         self.showNameSource = parsedValues.flags.contains("showNameSource")
         self.interactive = parsedValues.flags.contains("interactive")
+        self.refocusTerminal = parsedValues.flags.contains("refocusTerminal")
         self.submitAfterSetValue = parsedValues.flags.contains("submitAfterSetValue")
 
         if let fileValue = parsedValues.options["file"]?.last {

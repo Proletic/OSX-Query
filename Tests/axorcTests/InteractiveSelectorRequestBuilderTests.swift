@@ -27,6 +27,20 @@ struct InteractiveSelectorRequestBuilderTests {
         #expect(request?.appIdentifier == "com.apple.TextEdit")
         #expect(request?.initialSelector == "AXButton")
         #expect(request?.maxDepth == Int.max)
+        #expect(request?.refocusTerminalAfterInteractions == false)
+    }
+
+    @Test("Builds request with terminal refocus enabled")
+    func buildsRequestWithTerminalRefocusEnabled() throws {
+        let request = try InteractiveSelectorRequestBuilder.build(
+            app: "com.apple.TextEdit",
+            selector: "AXButton",
+            maxDepth: nil,
+            interactive: true,
+            refocusTerminalAfterInteractions: true,
+            hasStructuredInput: false)
+
+        #expect(request?.refocusTerminalAfterInteractions == true)
     }
 
     @Test("Builds request with nil initial selector when selector is empty")
