@@ -1,5 +1,6 @@
 // AXORCMain.swift - Main entry point for AXORC CLI
 
+import AppKit
 import AXorcist
 @preconcurrency import Commander
 import CoreFoundation
@@ -68,6 +69,11 @@ struct AXORCCommand: ParsableCommand {
 
     @Flag(name: .customLong("show-path"), help: "Include full generated path per selector match.")
     var showPath: Bool = false
+
+    @Option(
+        name: .customLong("enable-ax"),
+        help: "Enable AXEnhancedUserInterface and AXManualAccessibility for a running bundle id. Temporarily focuses target app and restores original focus.")
+    var enableAppAx: String?
 
     @Option(name: .long, help: "Traversal timeout in seconds (overrides default 30).")
     var timeout: Int?
@@ -191,6 +197,11 @@ struct AXORCCommand: ParsableCommand {
         self.applyGlobalFlags()
         self.logDebugVersion()
 
+        if let exposureRequest = try self.buildAXExposureRequestIfNeeded() {
+            try self.runAXExposureMode(request: exposureRequest)
+            return
+        }
+
         if let selectorRequest = try self.buildSelectorRequestIfNeeded() {
             try self.runSelectorMode(request: selectorRequest)
             return
@@ -283,6 +294,35 @@ struct AXORCCommand: ParsableCommand {
     private func hasAnyStructuredInput() -> Bool {
         let hasPositionalPayload = !(self.directPayload?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         return self.stdin || self.file != nil || self.json != nil || hasPositionalPayload
+    }
+
+    private func hasAnySelectorInput() -> Bool {
+        let hasApp = !(self.app?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let hasSelector = !(self.selector?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        return hasApp || hasSelector || self.selectorMaxDepth != nil || self.limit != nil || self.noColor || self.showPath
+    }
+
+    private mutating func buildAXExposureRequestIfNeeded() throws -> AXExposureRequest? {
+        do {
+            return try AXExposureRequestBuilder.build(
+                bundleIdentifier: self.enableAppAx,
+                hasStructuredInput: self.hasAnyStructuredInput(),
+                hasSelectorInput: self.hasAnySelectorInput())
+        } catch let exposureError as AXExposureCLIError {
+            throw ValidationError(exposureError.localizedDescription)
+        }
+    }
+
+    private mutating func runAXExposureMode(request: AXExposureRequest) throws {
+        do {
+            let runner = AXExposureRunner()
+            let report = try runner.execute(request)
+            print(AXExposureOutputFormatter.format(report: report))
+            fflush(stdout)
+            axClearLogs()
+        } catch let exposureError as AXExposureCLIError {
+            throw ValidationError(exposureError.localizedDescription)
+        }
     }
 
     private mutating func buildSelectorRequestIfNeeded() throws -> SelectorQueryRequest? {
@@ -436,6 +476,10 @@ extension AXORCCommand {
 
         if let selectorValue = parsedValues.options["selector"]?.last {
             self.selector = selectorValue
+        }
+
+        if let enableAppAxValue = parsedValues.options["enableAppAx"]?.last {
+            self.enableAppAx = enableAppAxValue
         }
 
         self.directPayload = parsedValues.positional.first
