@@ -681,6 +681,12 @@ private enum LiveSelectorQueryExecutor {
             }
             Thread.sleep(forTimeInterval: self.sendKeystrokesSubmitStepDelaySeconds)
 
+            guard self.clickElement(targetElement) else {
+                succeeded = false
+                break
+            }
+            Thread.sleep(forTimeInterval: self.sendKeystrokesSubmitStepDelaySeconds)
+
             do {
                 try Element.typeText(value, delay: 0)
             } catch {
