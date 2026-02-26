@@ -1,8 +1,15 @@
+import Foundation
 import Testing
 @testable import axorc
 
 @Suite("Selector Query Output Formatter")
 struct SelectorQueryOutputFormatterTests {
+    @Test("Stringify handles NSNull and attributed strings")
+    func stringifyHandlesNullAndAttributedStrings() {
+        #expect(SelectorMatchSummary.stringify(NSNull()) == nil)
+        #expect(SelectorMatchSummary.stringify(NSAttributedString(string: "Moulik")) == "Moulik")
+    }
+
     @Test("Formats stats and element rows without ANSI")
     func formatsWithoutColor() {
         let request = SelectorQueryRequest(

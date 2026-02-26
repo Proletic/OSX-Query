@@ -183,11 +183,17 @@ struct SelectorMatchSummary: Equatable {
         return trimmed
     }
 
-    fileprivate static func stringify(_ value: Any?) -> String? {
+    static func stringify(_ value: Any?) -> String? {
         guard let value else { return nil }
 
+        if value is NSNull {
+            return nil
+        }
         if let string = value as? String {
             return string
+        }
+        if let attributed = value as? NSAttributedString {
+            return attributed.string
         }
         if let number = value as? NSNumber {
             if CFGetTypeID(number) == CFBooleanGetTypeID() {
@@ -353,6 +359,24 @@ private enum LiveSelectorQueryExecutor {
             return element.subrole()
         case AXAttributeNames.kAXPIDAttribute:
             return element.pid().map(String.init)
+        case AXAttributeNames.kAXTitleAttribute:
+            return element.title()
+        case AXAttributeNames.kAXDescriptionAttribute:
+            return element.descriptionText()
+        case AXAttributeNames.kAXHelpAttribute:
+            return element.help()
+        case AXAttributeNames.kAXIdentifierAttribute:
+            return element.identifier()
+        case AXAttributeNames.kAXRoleDescriptionAttribute:
+            return element.roleDescription()
+        case AXAttributeNames.kAXPlaceholderValueAttribute:
+            return element.attribute(Attribute<String>(AXAttributeNames.kAXPlaceholderValueAttribute))
+        case AXAttributeNames.kAXEnabledAttribute:
+            return element.isEnabled().map { $0 ? "true" : "false" }
+        case AXAttributeNames.kAXFocusedAttribute:
+            return element.isFocused().map { $0 ? "true" : "false" }
+        case AXAttributeNames.kAXValueAttribute:
+            return SelectorMatchSummary.stringify(element.value())
         case AXMiscConstants.computedNameAttributeKey:
             return element.computedName()
         case AXMiscConstants.isIgnoredAttributeKey:
