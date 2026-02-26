@@ -174,6 +174,44 @@ struct SelectorQueryRequestBuilderTests {
         #expect(request?.interaction?.action == .press)
     }
 
+    @Test("Builds focus interaction request when provided")
+    func buildsFocusInteractionRequest() throws {
+        let request = try SelectorQueryRequestBuilder.build(
+            app: "com.apple.TextEdit",
+            selector: "AXTextField",
+            maxDepth: nil,
+            limit: nil,
+            noColor: false,
+            showPath: false,
+            interaction: "focus",
+            resultIndex: 3,
+            hasStructuredInput: false,
+            stdoutSupportsANSI: true)
+
+        #expect(request?.interaction?.resultIndex == 3)
+        #expect(request?.interaction?.action == .focus)
+    }
+
+    @Test("Builds set-value submit interaction when submit flag is set")
+    func buildsSetValueSubmitInteractionRequest() throws {
+        let request = try SelectorQueryRequestBuilder.build(
+            app: "com.apple.TextEdit",
+            selector: "AXTextField",
+            maxDepth: nil,
+            limit: nil,
+            noColor: false,
+            showPath: false,
+            interaction: "set-value",
+            interactionValue: "hello",
+            submitAfterSetValue: true,
+            resultIndex: 1,
+            hasStructuredInput: false,
+            stdoutSupportsANSI: true)
+
+        #expect(request?.interaction?.resultIndex == 1)
+        #expect(request?.interaction?.action == .setValueAndSubmit("hello"))
+    }
+
     @Test("Rejects interaction when result index is missing")
     func rejectsInteractionMissingResultIndex() {
         do {
@@ -236,6 +274,75 @@ struct SelectorQueryRequestBuilderTests {
             Issue.record("Expected build failure")
         } catch let error as SelectorQueryCLIError {
             #expect(error == .interactionValueRequired)
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    @Test("Rejects interaction value for focus")
+    func rejectsInteractionValueForFocus() {
+        do {
+            _ = try SelectorQueryRequestBuilder.build(
+                app: "com.apple.TextEdit",
+                selector: "AXButton",
+                maxDepth: nil,
+                limit: nil,
+                noColor: false,
+                showPath: false,
+                interaction: "focus",
+                interactionValue: "ignored",
+                resultIndex: 1,
+                hasStructuredInput: false,
+                stdoutSupportsANSI: true)
+            Issue.record("Expected build failure")
+        } catch let error as SelectorQueryCLIError {
+            #expect(error == .interactionValueNotAllowed("focus"))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    @Test("Rejects submit-after-set-value for non set-value interactions")
+    func rejectsSubmitFlagForNonSetValueInteraction() {
+        do {
+            _ = try SelectorQueryRequestBuilder.build(
+                app: "com.apple.TextEdit",
+                selector: "AXButton",
+                maxDepth: nil,
+                limit: nil,
+                noColor: false,
+                showPath: false,
+                interaction: "click",
+                submitAfterSetValue: true,
+                resultIndex: 1,
+                hasStructuredInput: false,
+                stdoutSupportsANSI: true)
+            Issue.record("Expected build failure")
+        } catch let error as SelectorQueryCLIError {
+            #expect(error == .submitFlagRequiresSetValue)
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    @Test("Rejects submit-after-set-value when interaction is omitted")
+    func rejectsSubmitFlagWithoutInteraction() {
+        do {
+            _ = try SelectorQueryRequestBuilder.build(
+                app: "com.apple.TextEdit",
+                selector: "AXButton",
+                maxDepth: nil,
+                limit: nil,
+                noColor: false,
+                showPath: false,
+                interaction: nil,
+                submitAfterSetValue: true,
+                resultIndex: 1,
+                hasStructuredInput: false,
+                stdoutSupportsANSI: true)
+            Issue.record("Expected build failure")
+        } catch let error as SelectorQueryCLIError {
+            #expect(error == .missingInteraction)
         } catch {
             Issue.record("Unexpected error: \(error)")
         }

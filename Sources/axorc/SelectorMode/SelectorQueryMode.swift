@@ -16,6 +16,7 @@ enum SelectorQueryCLIError: LocalizedError, Equatable {
     case unknownInteraction(String)
     case interactionValueRequired
     case interactionValueNotAllowed(String)
+    case submitFlagRequiresSetValue
     case interactionTargetOutOfBounds(index: Int, matchedCount: Int)
     case interactionFailed(action: String, index: Int)
 
@@ -40,11 +41,13 @@ enum SelectorQueryCLIError: LocalizedError, Equatable {
         case let .invalidResultIndex(index):
             "--result-index must be greater than 0. Received: \(index)."
         case let .unknownInteraction(raw):
-            "Unknown --interaction '\(raw)'. Supported values: click, press, set-value."
+            "Unknown --interaction '\(raw)'. Supported values: click, press, focus, set-value."
         case .interactionValueRequired:
             "--interaction-value is required when --interaction is set to set-value."
         case let .interactionValueNotAllowed(action):
             "--interaction-value is only valid with --interaction set-value (received: \(action))."
+        case .submitFlagRequiresSetValue:
+            "--submit-after-set-value is only valid with --interaction set-value."
         case let .interactionTargetOutOfBounds(index, matchedCount):
             "--result-index \(index) is out of bounds for \(matchedCount) matched elements."
         case let .interactionFailed(action, index):
@@ -56,7 +59,9 @@ enum SelectorQueryCLIError: LocalizedError, Equatable {
 enum SelectorInteractionAction: Equatable {
     case click
     case press
+    case focus
     case setValue(String)
+    case setValueAndSubmit(String)
 
     var rawName: String {
         switch self {
@@ -64,8 +69,12 @@ enum SelectorInteractionAction: Equatable {
             return "click"
         case .press:
             return "press"
+        case .focus:
+            return "focus"
         case .setValue:
             return "set-value"
+        case .setValueAndSubmit:
+            return "set-value-submit"
         }
     }
 }
@@ -128,6 +137,7 @@ enum SelectorQueryRequestBuilder {
         showNameSource: Bool = false,
         interaction: String? = nil,
         interactionValue: String? = nil,
+        submitAfterSetValue: Bool = false,
         resultIndex: Int? = nil,
         hasStructuredInput: Bool,
         stdoutSupportsANSI: Bool) throws -> SelectorQueryRequest?
@@ -135,7 +145,8 @@ enum SelectorQueryRequestBuilder {
         let trimmedApp = app?.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedSelector = selector?.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedInteraction = interaction?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hasAnyInteractionInput = !(trimmedInteraction?.isEmpty ?? true) || interactionValue != nil || resultIndex != nil
+        let hasAnyInteractionInput = !(trimmedInteraction?.isEmpty ?? true) || interactionValue != nil || resultIndex != nil ||
+            submitAfterSetValue
 
         let hasApp = !(trimmedApp?.isEmpty ?? true)
         let hasSelector = !(trimmedSelector?.isEmpty ?? true)
@@ -177,13 +188,28 @@ enum SelectorQueryRequestBuilder {
                 if interactionValue != nil {
                     throw SelectorQueryCLIError.interactionValueNotAllowed("click")
                 }
+                if submitAfterSetValue {
+                    throw SelectorQueryCLIError.submitFlagRequiresSetValue
+                }
                 interactionRequest = SelectorInteractionRequest(resultIndex: resultIndex, action: .click)
 
             case "press":
                 if interactionValue != nil {
                     throw SelectorQueryCLIError.interactionValueNotAllowed("press")
                 }
+                if submitAfterSetValue {
+                    throw SelectorQueryCLIError.submitFlagRequiresSetValue
+                }
                 interactionRequest = SelectorInteractionRequest(resultIndex: resultIndex, action: .press)
+
+            case "focus":
+                if interactionValue != nil {
+                    throw SelectorQueryCLIError.interactionValueNotAllowed("focus")
+                }
+                if submitAfterSetValue {
+                    throw SelectorQueryCLIError.submitFlagRequiresSetValue
+                }
+                interactionRequest = SelectorInteractionRequest(resultIndex: resultIndex, action: .focus)
 
             case "set-value":
                 guard let interactionValue else {
@@ -191,7 +217,7 @@ enum SelectorQueryRequestBuilder {
                 }
                 interactionRequest = SelectorInteractionRequest(
                     resultIndex: resultIndex,
-                    action: .setValue(interactionValue))
+                    action: submitAfterSetValue ? .setValueAndSubmit(interactionValue) : .setValue(interactionValue))
 
             default:
                 throw SelectorQueryCLIError.unknownInteraction(trimmedInteraction)
@@ -607,8 +633,27 @@ private enum LiveSelectorQueryExecutor {
             succeeded = ((try? targetElement.click()) != nil)
         case .press:
             succeeded = targetElement.press()
+        case .focus:
+            succeeded = self.focusElement(targetElement)
         case let .setValue(value):
             succeeded = targetElement.setValue(value, forAttribute: AXAttributeNames.kAXValueAttribute)
+        case let .setValueAndSubmit(value):
+            guard self.focusElement(targetElement) else {
+                succeeded = false
+                break
+            }
+
+            guard targetElement.setValue(value, forAttribute: AXAttributeNames.kAXValueAttribute) else {
+                succeeded = false
+                break
+            }
+
+            do {
+                try Element.typeKey(.return)
+                succeeded = true
+            } catch {
+                succeeded = false
+            }
         }
 
         guard succeeded else {
@@ -622,6 +667,17 @@ private enum LiveSelectorQueryExecutor {
             action: interaction.action.rawName,
             role: targetElement.role() ?? "AXUnknown",
             computedName: SelectorMatchSummary.stringify(targetElement.computedName()))
+    }
+
+    @MainActor
+    private static func focusElement(_ element: Element) -> Bool {
+        if element.setValue(true, forAttribute: AXAttributeNames.kAXFocusedAttribute) {
+            return true
+        }
+        if element.press() {
+            return true
+        }
+        return ((try? element.click()) != nil)
     }
 }
 

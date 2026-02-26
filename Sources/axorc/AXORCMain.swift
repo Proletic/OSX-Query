@@ -76,11 +76,16 @@ struct AXORCCommand: ParsableCommand {
     @Option(name: .customLong("result-index"), help: "1-based matched selector result index to target for interaction.")
     var selectorResultIndex: Int?
 
-    @Option(name: .long, help: "Interaction for targeted selector result (click, press, set-value).")
+    @Option(name: .long, help: "Interaction for targeted selector result (click, press, focus, set-value).")
     var interaction: String?
 
     @Option(name: .customLong("interaction-value"), help: "Value used for --interaction set-value.")
     var interactionValue: String?
+
+    @Flag(
+        name: .customLong("submit-after-set-value"),
+        help: "With --interaction set-value, focus the target first, set value, then press Return.")
+    var submitAfterSetValue: Bool = false
 
     @Option(
         name: .customLong("enable-ax"),
@@ -311,7 +316,9 @@ struct AXORCCommand: ParsableCommand {
     private func hasAnySelectorInput() -> Bool {
         let hasApp = !(self.app?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         let hasSelector = !(self.selector?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-        return hasApp || hasSelector || self.selectorMaxDepth != nil || self.limit != nil || self.noColor || self.showPath || self.showNameSource || self.selectorResultIndex != nil || self.interaction != nil || self.interactionValue != nil
+        return hasApp || hasSelector || self.selectorMaxDepth != nil || self.limit != nil || self.noColor ||
+            self.showPath || self.showNameSource || self.selectorResultIndex != nil || self.interaction != nil ||
+            self.interactionValue != nil || self.submitAfterSetValue
     }
 
     private mutating func buildAXExposureRequestIfNeeded() throws -> AXExposureRequest? {
@@ -349,6 +356,7 @@ struct AXORCCommand: ParsableCommand {
                 showNameSource: self.showNameSource,
                 interaction: self.interaction,
                 interactionValue: self.interactionValue,
+                submitAfterSetValue: self.submitAfterSetValue,
                 resultIndex: self.selectorResultIndex,
                 hasStructuredInput: self.hasAnyStructuredInput(),
                 stdoutSupportsANSI: OutputCapabilities.stdoutSupportsANSI)
@@ -457,6 +465,7 @@ extension AXORCCommand {
         self.noColor = parsedValues.flags.contains("noColor")
         self.showPath = parsedValues.flags.contains("showPath")
         self.showNameSource = parsedValues.flags.contains("showNameSource")
+        self.submitAfterSetValue = parsedValues.flags.contains("submitAfterSetValue")
 
         if let fileValue = parsedValues.options["file"]?.last {
             self.file = fileValue
