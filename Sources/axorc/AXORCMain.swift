@@ -32,7 +32,7 @@ struct AXORCCommand: ParsableCommand {
         return CommandDescription(
             commandName: "axorc",
             // Use axorcVersion from AXORCModels.swift or a shared constant place
-            abstract: "AXORC CLI - Handles JSON commands via various input methods. Version \(version)")
+            abstract: "AXORC CLI - JSON command mode and OXQ selector query mode. Version \(version)")
     }
 
     // `--debug` now enables *normal* diagnostic output. Use the new `--verbose` flag for the extremely chatty logs.
@@ -50,6 +50,21 @@ struct AXORCCommand: ParsableCommand {
 
     @Option(name: .long, help: "Read JSON payload directly from this string argument, expecting a JSON string.")
     var json: String?
+
+    @Option(name: .long, help: "Target app for selector mode (bundle id, app name, PID, or 'focused').")
+    var app: String?
+
+    @Option(name: .long, help: "OXQ selector query for selector mode.")
+    var selector: String?
+
+    @Option(name: .customLong("max-depth"), help: "Selector mode max traversal depth (default 12).")
+    var selectorMaxDepth: Int?
+
+    @Option(name: .long, help: "Selector mode max result rows to print (default 50).")
+    var limit: Int?
+
+    @Flag(name: .customLong("no-color"), help: "Disable ANSI color output in selector mode.")
+    var noColor: Bool = false
 
     @Option(name: .long, help: "Traversal timeout in seconds (overrides default 30).")
     var timeout: Int?
@@ -173,6 +188,11 @@ struct AXORCCommand: ParsableCommand {
         self.applyGlobalFlags()
         self.logDebugVersion()
 
+        if let selectorRequest = try self.buildSelectorRequestIfNeeded() {
+            try self.runSelectorMode(request: selectorRequest)
+            return
+        }
+
         let inputResult = InputHandler.parseInput(
             stdin: self.stdin,
             file: self.file,
@@ -255,6 +275,40 @@ struct AXORCCommand: ParsableCommand {
 
     private func respondWithError(commandId: String, error: String, logs: [String]?) {
         Self.printErrorResponse(commandId: commandId, error: error, logs: logs)
+    }
+
+    private func hasAnyStructuredInput() -> Bool {
+        let hasPositionalPayload = !(self.directPayload?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        return self.stdin || self.file != nil || self.json != nil || hasPositionalPayload
+    }
+
+    private mutating func buildSelectorRequestIfNeeded() throws -> SelectorQueryRequest? {
+        do {
+            return try SelectorQueryRequestBuilder.build(
+                app: self.app,
+                selector: self.selector,
+                maxDepth: self.selectorMaxDepth,
+                limit: self.limit,
+                noColor: self.noColor,
+                hasStructuredInput: self.hasAnyStructuredInput(),
+                stdoutSupportsANSI: OutputCapabilities.stdoutSupportsANSI)
+        } catch let selectorError as SelectorQueryCLIError {
+            throw ValidationError(selectorError.localizedDescription)
+        }
+    }
+
+    private mutating func runSelectorMode(request: SelectorQueryRequest) throws {
+        do {
+            let runner = SelectorQueryRunner()
+            let report = try runner.execute(request)
+            print(SelectorQueryOutputFormatter.format(report: report))
+            fflush(stdout)
+            axClearLogs()
+        } catch let parseError as OXQParseError {
+            throw ValidationError("Invalid selector query: \(parseError.description)")
+        } catch let selectorError as SelectorQueryCLIError {
+            throw ValidationError(selectorError.localizedDescription)
+        }
     }
 
     private mutating func decodeAndExecute(jsonString: String, axorcist: AXorcist) throws {
@@ -340,6 +394,7 @@ extension AXORCCommand {
         self.stdin = parsedValues.flags.contains("stdin")
         self.scanAll = parsedValues.flags.contains("scanAll")
         self.noStopFirst = parsedValues.flags.contains("noStopFirst")
+        self.noColor = parsedValues.flags.contains("noColor")
 
         if let fileValue = parsedValues.options["file"]?.last {
             self.file = fileValue
@@ -354,6 +409,28 @@ extension AXORCCommand {
                 throw ValidationError("Invalid value for --timeout: \(timeoutString)")
             }
             self.timeout = timeoutValue
+        }
+
+        if let maxDepthString = parsedValues.options["selectorMaxDepth"]?.last {
+            guard let depthValue = Int(maxDepthString) else {
+                throw ValidationError("Invalid value for --max-depth: \(maxDepthString)")
+            }
+            self.selectorMaxDepth = depthValue
+        }
+
+        if let limitString = parsedValues.options["limit"]?.last {
+            guard let limitValue = Int(limitString) else {
+                throw ValidationError("Invalid value for --limit: \(limitString)")
+            }
+            self.limit = limitValue
+        }
+
+        if let appValue = parsedValues.options["app"]?.last {
+            self.app = appValue
+        }
+
+        if let selectorValue = parsedValues.options["selector"]?.last {
+            self.selector = selectorValue
         }
 
         self.directPayload = parsedValues.positional.first
