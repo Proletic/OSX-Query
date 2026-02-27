@@ -454,6 +454,61 @@ struct OXQSelectorEngineTests {
         #expect(fixture.ids(evaluation.matches).count == 13)
         #expect(evaluation.traversedNodeCount == 13)
     }
+
+    @Test("matches ancestor relationships when a node is reachable by multiple parents")
+    func matchesAncestorRelationshipsWithMultipleParentPaths() throws {
+        let app = FakeNode(id: "app")
+        let window = FakeNode(id: "window")
+        let container = FakeNode(id: "container")
+        let textArea = FakeNode(id: "textArea")
+
+        // `textArea` is reachable both from AXApplication extras and from the AXWindow subtree.
+        // This mirrors app-level AX extras like AXFocusedUIElement.
+        let childrenMap: [FakeNode: [FakeNode]] = [
+            app: [window, textArea],
+            window: [container],
+            container: [textArea],
+        ]
+
+        let roles: [FakeNode: String] = [
+            app: "AXApplication",
+            window: "AXWindow",
+            container: "AXGroup",
+            textArea: "AXTextArea",
+        ]
+
+        let attributes: [FakeNode: [String: String]] = [
+            textArea: [AXMiscConstants.computedNameAttributeKey: "Ask anything"],
+        ]
+
+        let engine = OXQSelectorEngine<FakeNode>(
+            children: { node in childrenMap[node] ?? [] },
+            role: { node in roles[node] },
+            attributeValue: { node, attributeName in
+                if attributeName == AXAttributeNames.kAXRoleAttribute {
+                    return roles[node]
+                }
+                return attributes[node]?[attributeName]
+            })
+
+        let appDirectMatches = try engine.findAll(
+            matching: #"AXApplication > AXTextArea[CPName*="Ask anything"]"#,
+            from: app,
+            maxDepth: 10)
+        #expect(appDirectMatches.map(\.id) == ["textArea"])
+
+        let descendantMatches = try engine.findAll(
+            matching: #"AXWindow AXTextArea[CPName*="Ask anything"]"#,
+            from: app,
+            maxDepth: 10)
+        #expect(descendantMatches.map(\.id) == ["textArea"])
+
+        let hasMatches = try engine.findAll(
+            matching: #"AXWindow:has(AXTextArea[CPName*="Ask anything"])"#,
+            from: app,
+            maxDepth: 10)
+        #expect(hasMatches.map(\.id) == ["window"])
+    }
 }
 
 private struct FakeNode: Hashable, Sendable {

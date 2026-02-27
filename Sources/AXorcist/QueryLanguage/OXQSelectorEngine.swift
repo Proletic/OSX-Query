@@ -140,7 +140,7 @@ private struct OXQIndexedTree<Node: Hashable> {
     {
         self.root = root
         var nodesInTraversalOrder: [Node] = []
-        var parentByNode: [Node: Node] = [:]
+        var parentsByNode: [Node: Set<Node>] = [:]
         var childrenByNode: [Node: [Node]] = [:]
         var roleByNode: [Node: String] = [:]
         var roleIndex: [String: [Node]] = [:]
@@ -150,16 +150,17 @@ private struct OXQIndexedTree<Node: Hashable> {
         while let entry = stack.popLast() {
             let node = entry.node
             let depth = entry.depth
+
+            if let parent = entry.parent {
+                parentsByNode[node, default: []].insert(parent)
+            }
+
             if let bestDepth = bestDepthByNode[node], depth >= bestDepth {
                 continue
             }
 
             let isFirstVisit = bestDepthByNode[node] == nil
             bestDepthByNode[node] = depth
-
-            if let parent = entry.parent {
-                parentByNode[node] = parent
-            }
 
             if isFirstVisit {
                 nodesInTraversalOrder.append(node)
@@ -181,7 +182,7 @@ private struct OXQIndexedTree<Node: Hashable> {
         }
 
         self.nodesInTraversalOrder = nodesInTraversalOrder
-        self.parentByNode = parentByNode
+        self.parentsByNode = parentsByNode
         self.childrenByNode = childrenByNode
         self.roleByNode = roleByNode
         self.roleIndex = roleIndex
@@ -191,7 +192,7 @@ private struct OXQIndexedTree<Node: Hashable> {
 
     let root: Node
     let nodesInTraversalOrder: [Node]
-    let parentByNode: [Node: Node]
+    let parentsByNode: [Node: Set<Node>]
     let childrenByNode: [Node: [Node]]
     let roleByNode: [Node: String]
     let roleIndex: [String: [Node]]
@@ -235,7 +236,9 @@ private struct OXQEvaluator<Node: Hashable> {
 
     private var compoundMatchCache: [OXQCompoundMatchKey<Node>: Bool] = [:]
     private var selectorSubjectMatchCache: [OXQSelectorSubjectMatchKey<Node>: Bool] = [:]
+    private var selectorLeftmostMatchCache: [OXQSelectorSubjectMatchKey<Node>: [Node]] = [:]
     private var descendantsCache: [Node: [Node]] = [:]
+    private var ancestorsCache: [Node: Set<Node>] = [:]
 
     private mutating func evaluateSelector(_ selector: OXQSelector) -> [Node] {
         let selectorParts = self.selectorParts(for: selector)
@@ -366,17 +369,21 @@ private struct OXQEvaluator<Node: Hashable> {
         let relation = relativeSelector.leadingCombinator ?? .descendant
         let candidateNodes = self.descendants(of: node)
         for candidate in candidateNodes {
-            guard let leftmostMatchNode = self.selectorLeftmostMatchNode(selector: relativeSelector.selector, subject: candidate) else {
+            let leftmostMatchNodes = self.selectorLeftmostMatchNodes(
+                selector: relativeSelector.selector,
+                subject: candidate)
+            guard !leftmostMatchNodes.isEmpty else {
                 continue
             }
-            guard self.isRelativeMatchAnchored(
-                anchor: node,
-                relation: relation,
-                leftmostMatchNode: leftmostMatchNode)
-            else {
-                continue
+            for leftmostMatchNode in leftmostMatchNodes {
+                if self.isRelativeMatchAnchored(
+                    anchor: node,
+                    relation: relation,
+                    leftmostMatchNode: leftmostMatchNode)
+                {
+                    return true
+                }
             }
-            return true
         }
         return false
     }
@@ -407,71 +414,97 @@ private struct OXQEvaluator<Node: Hashable> {
             return cached
         }
 
-        let didMatch = self.selectorLeftmostMatchNode(selector: selector, subject: subject) != nil
+        let didMatch = !self.selectorLeftmostMatchNodes(selector: selector, subject: subject).isEmpty
         self.selectorSubjectMatchCache[key] = didMatch
         return didMatch
     }
 
-    private mutating func selectorLeftmostMatchNode(selector: OXQSelector, subject: Node) -> Node? {
-        let selectorParts = self.selectorParts(for: selector)
-        guard let rightmostCompound = selectorParts.compounds.last else { return nil }
-        guard self.matchesCompound(subject, compound: rightmostCompound) else {
-            return nil
+    private mutating func selectorLeftmostMatchNodes(selector: OXQSelector, subject: Node) -> [Node] {
+        let key = OXQSelectorSubjectMatchKey(node: subject, selector: selector)
+        if let cached = self.selectorLeftmostMatchCache[key] {
+            return cached
         }
 
-        var currentNode = subject
+        let selectorParts = self.selectorParts(for: selector)
+        guard let rightmostCompound = selectorParts.compounds.last else {
+            self.selectorLeftmostMatchCache[key] = []
+            return []
+        }
+        guard self.matchesCompound(subject, compound: rightmostCompound) else {
+            self.selectorLeftmostMatchCache[key] = []
+            return []
+        }
+
+        var currentCandidates: Set<Node> = [subject]
 
         if selectorParts.compounds.count > 1 {
             for index in stride(from: selectorParts.compounds.count - 2, through: 0, by: -1) {
                 let requiredCompound = selectorParts.compounds[index]
                 let combinator = selectorParts.combinators[index]
+                var nextCandidates = Set<Node>()
 
-                switch combinator {
-                case .child:
-                    guard
-                        let parent = self.indexedTree.parentByNode[currentNode],
-                        self.matchesCompound(parent, compound: requiredCompound)
-                    else {
-                        return nil
-                    }
-                    currentNode = parent
-
-                case .descendant:
-                    var ancestor = self.indexedTree.parentByNode[currentNode]
-                    var matchedAncestor: Node?
-
-                    while let ancestorNode = ancestor {
-                        if self.matchesCompound(ancestorNode, compound: requiredCompound) {
-                            matchedAncestor = ancestorNode
-                            break
+                for currentNode in currentCandidates {
+                    switch combinator {
+                    case .child:
+                        for parent in self.parents(of: currentNode)
+                            where self.matchesCompound(parent, compound: requiredCompound)
+                        {
+                            nextCandidates.insert(parent)
                         }
-                        ancestor = self.indexedTree.parentByNode[ancestorNode]
-                    }
 
-                    guard let matchedAncestor else {
-                        return nil
+                    case .descendant:
+                        for ancestor in self.ancestors(of: currentNode)
+                            where self.matchesCompound(ancestor, compound: requiredCompound)
+                        {
+                            nextCandidates.insert(ancestor)
+                        }
                     }
-                    currentNode = matchedAncestor
                 }
+
+                if nextCandidates.isEmpty {
+                    self.selectorLeftmostMatchCache[key] = []
+                    return []
+                }
+                currentCandidates = nextCandidates
             }
         }
 
-        return currentNode
+        let leftmostMatches = self.indexedTree.nodesInTraversalOrder.filter { currentCandidates.contains($0) }
+        self.selectorLeftmostMatchCache[key] = leftmostMatches
+        return leftmostMatches
     }
 
-    private func isRelativeMatchAnchored(anchor: Node, relation: OXQCombinator, leftmostMatchNode: Node) -> Bool {
+    private func parents(of node: Node) -> Set<Node> {
+        self.indexedTree.parentsByNode[node] ?? []
+    }
+
+    private mutating func ancestors(of node: Node) -> Set<Node> {
+        if let cached = self.ancestorsCache[node] {
+            return cached
+        }
+
+        var seen = Set<Node>()
+        var stack = Array(self.parents(of: node))
+
+        while let candidate = stack.popLast() {
+            guard seen.insert(candidate).inserted else {
+                continue
+            }
+            for parent in self.parents(of: candidate) {
+                stack.append(parent)
+            }
+        }
+
+        self.ancestorsCache[node] = seen
+        return seen
+    }
+
+    private mutating func isRelativeMatchAnchored(anchor: Node, relation: OXQCombinator, leftmostMatchNode: Node) -> Bool {
         switch relation {
         case .child:
-            return self.indexedTree.parentByNode[leftmostMatchNode] == anchor
+            return self.parents(of: leftmostMatchNode).contains(anchor)
         case .descendant:
-            var ancestor = self.indexedTree.parentByNode[leftmostMatchNode]
-            while let ancestorNode = ancestor {
-                if ancestorNode == anchor {
-                    return true
-                }
-                ancestor = self.indexedTree.parentByNode[ancestorNode]
-            }
-            return false
+            return self.ancestors(of: leftmostMatchNode).contains(anchor)
         }
     }
 
