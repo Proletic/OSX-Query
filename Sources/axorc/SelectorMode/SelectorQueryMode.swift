@@ -1,5 +1,6 @@
 import AppKit
 import AXorcist
+import ApplicationServices
 import Darwin
 import Foundation
 
@@ -517,6 +518,14 @@ struct SelectorQueryRunner {
 
 @MainActor
 private enum LiveSelectorQueryExecutor {
+    private struct SelectorPrefetchSnapshot {
+        let childrenByElement: [Element: [Element]]
+        let parentByElement: [Element: Element]
+        let roleByElement: [Element: String]
+        let attributeValuesByElement: [Element: [String: String]]
+        let prefetchedAttributeNames: Set<String>
+    }
+
     private static let setValueSubmitStepDelaySeconds: TimeInterval = 0.2
     private static let sendKeystrokesSubmitStepDelaySeconds: TimeInterval = 0.3
     private static let postActivationClickDelaySeconds: TimeInterval = 0.2
@@ -529,14 +538,29 @@ private enum LiveSelectorQueryExecutor {
             throw SelectorQueryCLIError.applicationNotFound(request.appIdentifier)
         }
 
+        let syntaxTree = try OXQParser().parse(request.selector)
+        let prefetchedAttributeNames = self.prefetchAttributeNames(for: syntaxTree)
+        let prefetchedSnapshot = self.prefetchSnapshot(
+            root: root,
+            maxDepth: request.maxDepth,
+            attributeNames: prefetchedAttributeNames)
+
         let childrenProvider: (Element) -> [Element] = { element in
-            element.children(strict: false, includeApplicationExtras: element == root) ?? []
+            prefetchedSnapshot.childrenByElement[element] ?? []
         }
         let roleProvider: (Element) -> String? = { element in
-            element.role()
+            prefetchedSnapshot.roleByElement[element] ??
+                self.stringValue(for: element, attributeName: AXAttributeNames.kAXRoleAttribute)
         }
         let attributeValueProvider: (Element, String) -> String? = { element, attributeName in
-            self.stringValue(for: element, attributeName: attributeName)
+            let canonicalName = self.canonicalAttributeName(attributeName)
+            if let prefetched = prefetchedSnapshot.attributeValuesByElement[element]?[canonicalName] {
+                return prefetched
+            }
+            if prefetchedSnapshot.prefetchedAttributeNames.contains(canonicalName) {
+                return nil
+            }
+            return self.stringValue(for: element, attributeName: canonicalName)
         }
 
         let selectorEngine = OXQSelectorEngine<Element>(
@@ -550,15 +574,16 @@ private enum LiveSelectorQueryExecutor {
             attributeValueProvider: attributeValueProvider,
             preferDerivedComputedName: true)
 
-        let evaluation = try selectorEngine.findAllWithMetrics(
-            matching: request.selector,
+        let evaluation = selectorEngine.findAllWithMetrics(
+            matching: syntaxTree,
             from: root,
             maxDepth: request.maxDepth,
             memoizationContext: memoizationContext)
         let matchedElements = evaluation.matches
         let interactionSummary = try self.performInteractionIfRequested(
             request.interaction,
-            matchedElements: matchedElements)
+            matchedElements: matchedElements,
+            memoizationContext: memoizationContext)
 
         let shownElements = matchedElements.prefix(request.limit)
         let shownSummaries = shownElements.map { element in
@@ -588,7 +613,9 @@ private enum LiveSelectorQueryExecutor {
                     memoizationContext.attributeValue(of: element, attributeName: AXAttributeNames.kAXIdentifierAttribute)),
                 descriptionText: SelectorMatchSummary.normalize(
                     memoizationContext.attributeValue(of: element, attributeName: AXAttributeNames.kAXDescriptionAttribute)),
-                path: request.showPath ? SelectorMatchSummary.normalize(element.generatePathString()) : nil)
+                path: request.showPath
+                    ? SelectorMatchSummary.normalize(self.cachedPathString(for: element, snapshot: prefetchedSnapshot))
+                    : nil)
         }
 
         return SelectorQueryResult(
@@ -633,7 +660,7 @@ private enum LiveSelectorQueryExecutor {
     }
 
     private static func stringValue(for element: Element, attributeName: String) -> String? {
-        let canonicalName = PathUtils.attributeKeyMappings[attributeName.lowercased()] ?? attributeName
+        let canonicalName = self.canonicalAttributeName(attributeName)
 
         switch canonicalName {
         case AXAttributeNames.kAXRoleAttribute:
@@ -674,6 +701,248 @@ private enum LiveSelectorQueryExecutor {
         return SelectorMatchSummary.stringify(rawValue)
     }
 
+    private static func canonicalAttributeName(_ name: String) -> String {
+        PathUtils.attributeKeyMappings[name.lowercased()] ?? name
+    }
+
+    private static func prefetchAttributeNames(for syntaxTree: OXQSyntaxTree) -> Set<String> {
+        var names: Set<String> = [
+            AXAttributeNames.kAXRoleAttribute,
+            AXAttributeNames.kAXTitleAttribute,
+            AXAttributeNames.kAXValueAttribute,
+            AXAttributeNames.kAXIdentifierAttribute,
+            AXAttributeNames.kAXDescriptionAttribute,
+            AXAttributeNames.kAXHelpAttribute,
+            AXAttributeNames.kAXPlaceholderValueAttribute,
+            AXAttributeNames.kAXSelectedTextAttribute,
+            AXAttributeNames.kAXEnabledAttribute,
+            AXAttributeNames.kAXFocusedAttribute,
+            AXAttributeNames.kAXSubroleAttribute,
+            AXAttributeNames.kAXPIDAttribute,
+            AXAttributeNames.kAXRoleDescriptionAttribute,
+        ]
+
+        for selector in syntaxTree.selectors {
+            self.collectAttributeNames(in: selector, into: &names)
+        }
+
+        return names
+    }
+
+    private static func collectAttributeNames(in selector: OXQSelector, into names: inout Set<String>) {
+        self.collectAttributeNames(in: selector.leading, into: &names)
+        for link in selector.links {
+            self.collectAttributeNames(in: link.compound, into: &names)
+        }
+    }
+
+    private static func collectAttributeNames(in compound: OXQCompound, into names: inout Set<String>) {
+        for attribute in compound.attributes {
+            self.collectAttributeName(attribute.name, into: &names)
+        }
+
+        for pseudo in compound.pseudos {
+            switch pseudo {
+            case let .not(selectors):
+                for selector in selectors {
+                    self.collectAttributeNames(in: selector, into: &names)
+                }
+            case let .has(argument):
+                switch argument {
+                case let .selectors(selectors):
+                    for selector in selectors {
+                        self.collectAttributeNames(in: selector, into: &names)
+                    }
+                case let .relativeSelectors(relativeSelectors):
+                    for relativeSelector in relativeSelectors {
+                        self.collectAttributeNames(in: relativeSelector.selector, into: &names)
+                    }
+                }
+            }
+        }
+    }
+
+    private static func collectAttributeName(_ rawName: String, into names: inout Set<String>) {
+        let canonicalName = self.canonicalAttributeName(rawName)
+        if canonicalName == AXMiscConstants.computedNameAttributeKey {
+            names.formUnion([
+                AXAttributeNames.kAXRoleAttribute,
+                AXAttributeNames.kAXTitleAttribute,
+                AXAttributeNames.kAXValueAttribute,
+                AXAttributeNames.kAXIdentifierAttribute,
+                AXAttributeNames.kAXDescriptionAttribute,
+                AXAttributeNames.kAXHelpAttribute,
+                AXAttributeNames.kAXPlaceholderValueAttribute,
+                AXAttributeNames.kAXSelectedTextAttribute,
+            ])
+            return
+        }
+
+        if canonicalName == AXMiscConstants.isIgnoredAttributeKey {
+            return
+        }
+
+        names.insert(canonicalName)
+    }
+
+    private static func prefetchSnapshot(
+        root: Element,
+        maxDepth: Int,
+        attributeNames: Set<String>) -> SelectorPrefetchSnapshot
+    {
+        let safeMaxDepth = max(0, maxDepth)
+        let orderedAttributeNames = Array(attributeNames).sorted()
+
+        var childrenByElement: [Element: [Element]] = [:]
+        var parentByElement: [Element: Element] = [:]
+        var roleByElement: [Element: String] = [:]
+        var attributeValuesByElement: [Element: [String: String]] = [:]
+        var bestDepthByElement: [Element: Int] = [:]
+        var stack: [(element: Element, depth: Int, parent: Element?)] = [(root, 0, nil)]
+
+        while let entry = stack.popLast() {
+            let element = entry.element
+            let depth = entry.depth
+
+            if let parent = entry.parent {
+                parentByElement[element] = parent
+            }
+
+            if let bestDepth = bestDepthByElement[element], depth >= bestDepth {
+                continue
+            }
+
+            bestDepthByElement[element] = depth
+
+            let prefetchedAttributes = self.batchFetchAttributeValues(
+                for: element,
+                attributeNames: orderedAttributeNames)
+            if !prefetchedAttributes.isEmpty {
+                attributeValuesByElement[element] = prefetchedAttributes
+            }
+
+            if let role = prefetchedAttributes[AXAttributeNames.kAXRoleAttribute] ??
+                self.stringValue(for: element, attributeName: AXAttributeNames.kAXRoleAttribute)
+            {
+                roleByElement[element] = role
+                var attributes = attributeValuesByElement[element] ?? [:]
+                attributes[AXAttributeNames.kAXRoleAttribute] = role
+                attributeValuesByElement[element] = attributes
+            }
+
+            let children: [Element]
+            if depth < safeMaxDepth {
+                children = element.children(strict: false, includeApplicationExtras: element == root) ?? []
+            } else {
+                children = []
+            }
+            childrenByElement[element] = children
+
+            for child in children.reversed() {
+                stack.append((child, depth + 1, element))
+            }
+        }
+
+        return SelectorPrefetchSnapshot(
+            childrenByElement: childrenByElement,
+            parentByElement: parentByElement,
+            roleByElement: roleByElement,
+            attributeValuesByElement: attributeValuesByElement,
+            prefetchedAttributeNames: attributeNames)
+    }
+
+    private static func batchFetchAttributeValues(
+        for element: Element,
+        attributeNames: [String]) -> [String: String]
+    {
+        guard !attributeNames.isEmpty else { return [:] }
+
+        let cfAttributeNames = attributeNames.map { $0 as CFString } as CFArray
+        var values: CFArray?
+        let status = AXUIElementCopyMultipleAttributeValues(
+            element.underlyingElement,
+            cfAttributeNames,
+            AXCopyMultipleAttributeOptions(rawValue: 0),
+            &values)
+
+        guard status == .success, let rawValues = values as? [Any] else {
+            var fallbackValues: [String: String] = [:]
+            for name in attributeNames {
+                if let value = self.stringValue(for: element, attributeName: name) {
+                    fallbackValues[name] = value
+                }
+            }
+            return fallbackValues
+        }
+
+        var result: [String: String] = [:]
+        let pairCount = min(attributeNames.count, rawValues.count)
+
+        for index in 0..<pairCount {
+            let name = attributeNames[index]
+            if let value = self.stringifyBatchAttributeValue(rawValues[index]) {
+                result[name] = value
+            }
+        }
+
+        if rawValues.count < attributeNames.count {
+            for name in attributeNames[rawValues.count...] {
+                if let value = self.stringValue(for: element, attributeName: name) {
+                    result[name] = value
+                }
+            }
+        }
+
+        return result
+    }
+
+    private static func stringifyBatchAttributeValue(_ value: Any) -> String? {
+        if value is NSNull {
+            return nil
+        }
+
+        let object = value as AnyObject
+        let typeRef = object as CFTypeRef
+        if CFGetTypeID(typeRef) == AXValueGetTypeID() {
+            let axValue = unsafeDowncast(object, to: AXValue.self)
+            if AXValueGetType(axValue) == .axError {
+                return nil
+            }
+        }
+
+        return SelectorMatchSummary.stringify(value)
+    }
+
+    private static func cachedPathString(for element: Element, snapshot: SelectorPrefetchSnapshot) -> String {
+        var chain: [Element] = []
+        var visited = Set<Element>()
+        var current: Element? = element
+
+        while let node = current, visited.insert(node).inserted {
+            chain.append(node)
+            current = snapshot.parentByElement[node]
+        }
+
+        return chain.reversed().map { node in
+            var parts: [String] = []
+            let role = snapshot.roleByElement[node] ??
+                snapshot.attributeValuesByElement[node]?[AXAttributeNames.kAXRoleAttribute] ??
+                "AXUnknown"
+            parts.append("Role: \(role)")
+
+            if let title = snapshot.attributeValuesByElement[node]?[AXAttributeNames.kAXTitleAttribute], !title.isEmpty {
+                parts.append("Title: '\(title)'")
+            }
+            if let identifier = snapshot.attributeValuesByElement[node]?[AXAttributeNames.kAXIdentifierAttribute],
+               !identifier.isEmpty
+            {
+                parts.append("ID: '\(identifier)'")
+            }
+
+            return parts.joined(separator: ", ")
+        }.joined(separator: " -> ")
+    }
+
     private static func parseBool(_ value: String?) -> Bool? {
         guard let value else { return nil }
         switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
@@ -689,7 +958,8 @@ private enum LiveSelectorQueryExecutor {
     @MainActor
     private static func performInteractionIfRequested(
         _ interaction: SelectorInteractionRequest?,
-        matchedElements: [Element]) throws -> SelectorInteractionSummary?
+        matchedElements: [Element],
+        memoizationContext: OXQQueryMemoizationContext<Element>) throws -> SelectorInteractionSummary?
     {
         guard let interaction else { return nil }
         guard interaction.resultIndex <= matchedElements.count else {
@@ -711,7 +981,8 @@ private enum LiveSelectorQueryExecutor {
         case let .setValue(value):
             succeeded = targetElement.setValue(value, forAttribute: AXAttributeNames.kAXValueAttribute)
         case let .setValueAndSubmit(value):
-            guard self.clickForSetValueSubmit(targetElement) else {
+            let cachedRole = memoizationContext.role(of: targetElement)
+            guard self.clickForSetValueSubmit(targetElement, role: cachedRole) else {
                 succeeded = false
                 break
             }
@@ -730,7 +1001,8 @@ private enum LiveSelectorQueryExecutor {
                 succeeded = false
             }
         case let .sendKeystrokesAndSubmit(value):
-            guard self.clickForSendKeystrokesSubmit(targetElement) else {
+            let cachedRole = memoizationContext.role(of: targetElement)
+            guard self.clickForSendKeystrokesSubmit(targetElement, role: cachedRole) else {
                 succeeded = false
                 break
             }
@@ -761,8 +1033,8 @@ private enum LiveSelectorQueryExecutor {
         return SelectorInteractionSummary(
             resultIndex: interaction.resultIndex,
             action: interaction.action.rawName,
-            role: targetElement.role() ?? "AXUnknown",
-            computedName: SelectorMatchSummary.stringify(targetElement.computedName()))
+            role: memoizationContext.role(of: targetElement) ?? "AXUnknown",
+            computedName: SelectorMatchSummary.normalize(memoizationContext.computedNameDetails(of: targetElement)?.value))
     }
 
     @MainActor
@@ -821,16 +1093,16 @@ private enum LiveSelectorQueryExecutor {
     }
 
     @MainActor
-    private static func clickForSetValueSubmit(_ element: Element) -> Bool {
-        if self.shouldRetryFocusClicks(for: element) {
+    private static func clickForSetValueSubmit(_ element: Element, role: String?) -> Bool {
+        if self.shouldRetryFocusClicks(role: role) {
             return self.clickUntilFocused(element)
         }
         return self.clickElement(element)
     }
 
     @MainActor
-    private static func clickForSendKeystrokesSubmit(_ element: Element) -> Bool {
-        if self.shouldRetryFocusClicks(for: element) {
+    private static func clickForSendKeystrokesSubmit(_ element: Element, role: String?) -> Bool {
+        if self.shouldRetryFocusClicks(role: role) {
             return self.clickUntilFocused(element)
         }
 
@@ -868,11 +1140,7 @@ private enum LiveSelectorQueryExecutor {
     }
 
     @MainActor
-    private static func shouldRetryFocusClicks(for element: Element) -> Bool {
-        guard let role = element.role() else {
-            return false
-        }
-
+    private static func shouldRetryFocusClicks(role: String?) -> Bool {
         switch role {
         case AXRoleNames.kAXComboBoxRole, AXRoleNames.kAXTextFieldRole, AXRoleNames.kAXTextAreaRole:
             return true
