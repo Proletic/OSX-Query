@@ -467,6 +467,8 @@ enum OXAExecutor {
     private static let appActivationPollIntervalSeconds: TimeInterval = 0.05
     private static let appleScriptActivationTimeoutSeconds: TimeInterval = 0.35
     private static let processPollIntervalSeconds: TimeInterval = 0.01
+    private static let appLaunchWaitTimeoutSeconds: TimeInterval = 2.0
+    private static let windowCreationWaitTimeoutSeconds: TimeInterval = 1.0
     private static var lastActivationFailureDescription: String?
 
     static func execute(programSource: String) throws -> String {
@@ -1238,7 +1240,16 @@ enum OXAExecutor {
     }
 
     private static func openApplication(_ applicationIdentifier: String) throws {
-        if !self.runningApplications(matching: applicationIdentifier).isEmpty {
+        if let runningApp = self.runningApplications(matching: applicationIdentifier).first(where: { !$0.isTerminated }) {
+            guard self.ensureApplicationFrontmost(pid: runningApp.processIdentifier) else {
+                let details = self.lastActivationFailureDescription.map { " \($0)" } ?? ""
+                throw OXAActionError.runtime("Failed to activate '\(applicationIdentifier)'.\(details)")
+            }
+
+            if !self.applicationHasAnyWindow(runningApp) {
+                _ = self.reopenViaAppleScript(runningApp)
+                _ = self.waitForAnyWindow(in: runningApp, timeout: self.windowCreationWaitTimeoutSeconds)
+            }
             return
         }
 
@@ -1260,6 +1271,23 @@ enum OXAExecutor {
 
         guard process.terminationStatus == 0 else {
             throw OXAActionError.runtime("Failed to launch '\(applicationIdentifier)' (exit code \(process.terminationStatus)).")
+        }
+
+        guard let launchedApp = self.waitForRunningApplication(
+            matching: applicationIdentifier,
+            timeout: self.appLaunchWaitTimeoutSeconds)
+        else {
+            return
+        }
+
+        guard self.ensureApplicationFrontmost(pid: launchedApp.processIdentifier) else {
+            let details = self.lastActivationFailureDescription.map { " \($0)" } ?? ""
+            throw OXAActionError.runtime("Launched '\(applicationIdentifier)' but failed to activate it.\(details)")
+        }
+
+        if !self.applicationHasAnyWindow(launchedApp) {
+            _ = self.reopenViaAppleScript(launchedApp)
+            _ = self.waitForAnyWindow(in: launchedApp, timeout: self.windowCreationWaitTimeoutSeconds)
         }
     }
 
@@ -1283,6 +1311,73 @@ enum OXAExecutor {
                 _ = application.forceTerminate()
             }
         }
+    }
+
+    private static func reopenViaAppleScript(_ app: NSRunningApplication) -> Bool {
+        guard let bundleIdentifier = app.bundleIdentifier, !bundleIdentifier.isEmpty else {
+            return false
+        }
+
+        let escapedBundleIdentifier = bundleIdentifier
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", "tell application id \"\(escapedBundleIdentifier)\" to reopen"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            return false
+        }
+
+        guard self.waitForProcessExit(
+            process,
+            timeout: self.appleScriptActivationTimeoutSeconds,
+            pollInterval: self.processPollIntervalSeconds)
+        else {
+            return false
+        }
+
+        return process.terminationStatus == 0
+    }
+
+    private static func applicationHasAnyWindow(_ app: NSRunningApplication) -> Bool {
+        guard let appElement = getApplicationElement(for: app.processIdentifier) else {
+            return false
+        }
+        guard let windows = appElement.windows() else {
+            return false
+        }
+        return !windows.isEmpty
+    }
+
+    private static func waitForAnyWindow(in app: NSRunningApplication, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if self.applicationHasAnyWindow(app) {
+                return true
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        return self.applicationHasAnyWindow(app)
+    }
+
+    private static func waitForRunningApplication(
+        matching applicationIdentifier: String,
+        timeout: TimeInterval) -> NSRunningApplication?
+    {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let app = self.runningApplications(matching: applicationIdentifier).first(where: { !$0.isTerminated }) {
+                return app
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        return self.runningApplications(matching: applicationIdentifier).first(where: { !$0.isTerminated })
     }
 
     private static func runningApplications(matching applicationIdentifier: String) -> [NSRunningApplication] {

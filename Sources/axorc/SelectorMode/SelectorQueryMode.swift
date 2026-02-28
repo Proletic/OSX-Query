@@ -544,6 +544,7 @@ private enum LiveSelectorQueryExecutor {
         let roleByElement: [Element: String]
         let attributeValuesByElement: [Element: [String: String]]
         let prefetchedAttributeNames: Set<String>
+        let elementsByReference: [String: Element]
     }
 
     private struct SelectorPrefetchCacheEntry {
@@ -558,6 +559,7 @@ private enum LiveSelectorQueryExecutor {
     private static let postActivationClickDelaySeconds: TimeInterval = 0.2
     private static let textInputFocusRetryDelaySeconds: TimeInterval = 0.2
     private static let textInputFocusRetryMaxAttempts: Int = 7
+    private static let cacheReferenceAttributeName = "__axorc_ref"
     private static var prefetchCache: SelectorPrefetchCacheEntry?
 
     static func execute(_ request: SelectorQueryRequest) throws -> SelectorQueryResult
@@ -617,14 +619,13 @@ private enum LiveSelectorQueryExecutor {
             matchedElements: matchedElements,
             memoizationContext: memoizationContext)
 
+        let actionElementsByReference = prefetchedSnapshot.elementsByReference
         let shownElements = Array(matchedElements.prefix(request.limit))
-        var shownElementsByReference: [String: Element] = [:]
         let shownSummaries = try shownElements.map { element in
-            let reference = self.referenceForElement(element)
-            if let existing = shownElementsByReference[reference], existing != element {
-                throw SelectorQueryCLIError.referenceCollision(reference)
+            guard let reference = self.referenceForElement(element, snapshot: prefetchedSnapshot) else {
+                throw SelectorQueryCLIError.cachedSnapshotUnavailable(
+                    "Cached snapshot reference map is missing an element. Refresh with --cache-session.")
             }
-            shownElementsByReference[reference] = element
 
             let isEnabled = self.parseBool(memoizationContext.attributeValue(
                 of: element,
@@ -658,7 +659,7 @@ private enum LiveSelectorQueryExecutor {
                 reference: reference)
         }
         SelectorActionRefStore.replace(
-            with: shownElementsByReference,
+            with: actionElementsByReference,
             appPID: rootPID > 0 ? rootPID : nil)
 
         return SelectorQueryResult(
@@ -904,11 +905,18 @@ private enum LiveSelectorQueryExecutor {
         var roleByElement: [Element: String] = [:]
         var attributeValuesByElement: [Element: [String: String]] = [:]
         var bestDepthByElement: [Element: Int] = [:]
+        var elementsByReference: [String: Element] = [:]
+        var generatedReferences: Set<String> = []
         var stack: [(element: Element, depth: Int, parent: Element?)] = [(root, 0, nil)]
 
         while let entry = stack.popLast() {
             let element = entry.element
             let depth = entry.depth
+            let reference = self.ensureSnapshotReference(
+                for: element,
+                attributeValuesByElement: &attributeValuesByElement,
+                elementsByReference: &elementsByReference,
+                generatedReferences: &generatedReferences)
 
             if let parent = entry.parent {
                 parentByElement[element] = parent
@@ -923,9 +931,12 @@ private enum LiveSelectorQueryExecutor {
             let prefetchedAttributes = self.batchFetchAttributeValues(
                 for: element,
                 attributeNames: orderedAttributeNames)
+            var attributes = attributeValuesByElement[element] ?? [:]
             if !prefetchedAttributes.isEmpty {
-                attributeValuesByElement[element] = prefetchedAttributes
+                attributes.merge(prefetchedAttributes) { _, new in new }
             }
+            attributes[self.cacheReferenceAttributeName] = reference
+            attributeValuesByElement[element] = attributes
 
             if let role = prefetchedAttributes[AXAttributeNames.kAXRoleAttribute] ??
                 self.stringValue(for: element, attributeName: AXAttributeNames.kAXRoleAttribute)
@@ -954,7 +965,8 @@ private enum LiveSelectorQueryExecutor {
             parentByElement: parentByElement,
             roleByElement: roleByElement,
             attributeValuesByElement: attributeValuesByElement,
-            prefetchedAttributeNames: attributeNames)
+            prefetchedAttributeNames: attributeNames,
+            elementsByReference: elementsByReference)
     }
 
     private static func batchFetchAttributeValues(
@@ -1065,10 +1077,37 @@ private enum LiveSelectorQueryExecutor {
         self.prefetchCache = nil
     }
 
-    private static func referenceForElement(_ element: Element) -> String {
-        let hashValue = UInt64(CFHash(element.underlyingElement))
-        let truncated = hashValue & 0x0000_000F_FFFF_FFFF
-        return String(format: "%09llx", truncated)
+    private static func referenceForElement(_ element: Element, snapshot: SelectorPrefetchSnapshot) -> String? {
+        snapshot.attributeValuesByElement[element]?[self.cacheReferenceAttributeName]
+    }
+
+    private static func generateUniqueReference(existing: inout Set<String>) -> String {
+        while true {
+            let raw = UInt64.random(in: 0..<(1 << 36))
+            let candidate = String(format: "%09llx", raw)
+            if existing.insert(candidate).inserted {
+                return candidate
+            }
+        }
+    }
+
+    private static func ensureSnapshotReference(
+        for element: Element,
+        attributeValuesByElement: inout [Element: [String: String]],
+        elementsByReference: inout [String: Element],
+        generatedReferences: inout Set<String>) -> String
+    {
+        var attributes = attributeValuesByElement[element] ?? [:]
+        if let existing = attributes[self.cacheReferenceAttributeName] {
+            elementsByReference[existing] = element
+            return existing
+        }
+
+        let reference = self.generateUniqueReference(existing: &generatedReferences)
+        attributes[self.cacheReferenceAttributeName] = reference
+        attributeValuesByElement[element] = attributes
+        elementsByReference[reference] = element
+        return reference
     }
 
     @MainActor
