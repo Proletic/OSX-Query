@@ -62,9 +62,11 @@ enum OXAStatement: Equatable {
     case sendText(text: String, targetRef: String)
     case sendTextAsKeys(text: String, targetRef: String)
     case sendClick(targetRef: String)
+    case sendRightClick(targetRef: String)
     case sendDrag(sourceRef: String, targetRef: String)
     case sendHotkey(chord: OXAHotkeyChord, targetRef: String)
     case sendScroll(direction: OXAScrollDirection, targetRef: String)
+    case readAttribute(attributeName: String, targetRef: String)
     case sleep(milliseconds: Int)
     case open(app: String)
     case close(app: String)
@@ -103,7 +105,7 @@ struct OXAParser {
         private static let namedBaseKeys: Set<String> = [
             "enter", "tab", "space", "escape", "backspace", "delete",
             "home", "end", "page_up", "page_down",
-            "arrow_up", "arrow_down", "arrow_left", "arrow_right",
+            "up", "down", "left", "right",
         ]
 
         private var lexer: Lexer
@@ -133,6 +135,11 @@ struct OXAParser {
             switch keyword {
             case "send":
                 return try self.parseSendStatement()
+            case "read":
+                let attributeName = try self.expectWord()
+                _ = try self.expectWord("from")
+                let targetRef = try self.expectElementReference()
+                return .readAttribute(attributeName: attributeName, targetRef: targetRef)
             case "sleep":
                 let milliseconds = try self.expectInteger()
                 return .sleep(milliseconds: milliseconds)
@@ -163,6 +170,11 @@ struct OXAParser {
                 _ = try self.expectWord("to")
                 let targetRef = try self.expectElementReference()
                 return .sendClick(targetRef: targetRef)
+            case "right":
+                _ = try self.expectWord("click")
+                _ = try self.expectWord("to")
+                let targetRef = try self.expectElementReference()
+                return .sendRightClick(targetRef: targetRef)
             case "drag":
                 let sourceRef = try self.expectElementReference()
                 _ = try self.expectWord("to")
@@ -251,10 +263,10 @@ struct OXAParser {
                 "esc": "escape",
                 "pageup": "page_up",
                 "pagedown": "page_down",
-                "arrowup": "arrow_up",
-                "arrowdown": "arrow_down",
-                "arrowleft": "arrow_left",
-                "arrowright": "arrow_right",
+                "arrowup": "up",
+                "arrowdown": "down",
+                "arrowleft": "left",
+                "arrowright": "right",
             ]
 
             return aliases[lowered] ?? lowered
@@ -461,8 +473,11 @@ enum OXAExecutor {
 
         var output: [String] = []
         for (index, statement) in program.statements.enumerated() {
-            try self.execute(statement)
+            let readOutput = try self.execute(statement)
             output.append("ok [\(index + 1)] \(self.describe(statement))")
+            if let readOutput {
+                output.append("value [\(index + 1)] \(readOutput)")
+            }
         }
 
         if output.isEmpty {
@@ -473,7 +488,7 @@ enum OXAExecutor {
     }
 
     private static func preflightProgramApplication(_ program: OXAProgram) throws {
-        let references = self.elementReferences(in: program)
+        let references = self.elementReferencesRequiringActivation(in: program)
         guard !references.isEmpty else {
             return
         }
@@ -526,7 +541,7 @@ enum OXAExecutor {
         Thread.sleep(forTimeInterval: self.postPreflightDelaySeconds)
     }
 
-    private static func elementReferences(in program: OXAProgram) -> [String] {
+    private static func elementReferencesRequiringActivation(in program: OXAProgram) -> [String] {
         var references: [String] = []
 
         for statement in program.statements {
@@ -534,13 +549,14 @@ enum OXAExecutor {
             case let .sendText(_, targetRef),
                  let .sendTextAsKeys(_, targetRef),
                  let .sendClick(targetRef),
+                 let .sendRightClick(targetRef),
                  let .sendHotkey(_, targetRef),
                  let .sendScroll(_, targetRef):
                 references.append(targetRef)
             case let .sendDrag(sourceRef, targetRef):
                 references.append(sourceRef)
                 references.append(targetRef)
-            case .sleep, .open, .close:
+            case .readAttribute, .sleep, .open, .close:
                 continue
             }
         }
@@ -556,6 +572,8 @@ enum OXAExecutor {
             return "send text \"\(text)\" as keys to \(targetRef)"
         case let .sendClick(targetRef):
             return "send click to \(targetRef)"
+        case let .sendRightClick(targetRef):
+            return "send right click to \(targetRef)"
         case let .sendDrag(sourceRef, targetRef):
             return "send drag \(sourceRef) to \(targetRef)"
         case let .sendHotkey(chord, targetRef):
@@ -563,6 +581,8 @@ enum OXAExecutor {
             return "send hotkey \(hotkey) to \(targetRef)"
         case let .sendScroll(direction, targetRef):
             return "send scroll \(direction.rawValue) to \(targetRef)"
+        case let .readAttribute(attributeName, targetRef):
+            return "read \(attributeName) from \(targetRef)"
         case let .sleep(milliseconds):
             return "sleep \(milliseconds)"
         case let .open(app):
@@ -572,7 +592,7 @@ enum OXAExecutor {
         }
     }
 
-    private static func execute(_ statement: OXAStatement) throws {
+    private static func execute(_ statement: OXAStatement) throws -> String? {
         switch statement {
         case let .sendText(text, targetRef):
             let target = try self.resolveElementReference(targetRef)
@@ -583,6 +603,7 @@ enum OXAExecutor {
             guard target.setValue(text, forAttribute: AXAttributeNames.kAXValueAttribute) else {
                 throw OXAActionError.runtime("Failed to set AXValue on target element \(targetRef).")
             }
+            return nil
 
         case let .sendTextAsKeys(text, targetRef):
             let target = try self.resolveElementReference(targetRef)
@@ -596,11 +617,19 @@ enum OXAExecutor {
                 throw OXAActionError.runtime("Unable to determine owning app for text input target \(targetRef).")
             }
             try self.executeTextAsKeys(text, targetPid: targetPid)
+            return nil
 
         case let .sendClick(targetRef):
             let target = try self.resolveElementReference(targetRef)
             self.preflightTargetElement(target)
             try self.clickElementCenter(target)
+            return nil
+
+        case let .sendRightClick(targetRef):
+            let target = try self.resolveElementReference(targetRef)
+            self.preflightTargetElement(target)
+            try self.clickElementCenter(target, button: .right)
+            return nil
 
         case let .sendDrag(sourceRef, targetRef):
             let source = try self.resolveElementReference(sourceRef)
@@ -615,6 +644,7 @@ enum OXAExecutor {
             }
 
             try InputDriver.drag(from: sourceCenter, to: destinationCenter, steps: 20, interStepDelay: 0.005)
+            return nil
 
         case let .sendHotkey(chord, targetRef):
             let target = try self.resolveElementReference(targetRef)
@@ -623,6 +653,7 @@ enum OXAExecutor {
                 throw OXAActionError.runtime("Unable to determine owning app for hotkey target \(targetRef).")
             }
             try self.executeHotkey(chord, targetPid: targetPid)
+            return nil
 
         case let .sendScroll(direction, targetRef):
             let target = try self.resolveElementReference(targetRef)
@@ -631,20 +662,32 @@ enum OXAExecutor {
                 throw OXAActionError.runtime("Unable to resolve frame for scroll target \(targetRef).")
             }
             try self.scroll(direction: direction, at: center)
+            return nil
+
+        case let .readAttribute(attributeName, targetRef):
+            let target = try self.resolveElementReference(targetRef)
+            guard let value = self.readAttributeValue(from: target, attributeName: attributeName) else {
+                throw OXAActionError.runtime(
+                    "Attribute '\(attributeName)' has no readable value on target \(targetRef).")
+            }
+            return value
 
         case let .sleep(milliseconds):
             guard milliseconds >= 0 else {
                 throw OXAActionError.runtime("Sleep duration must be non-negative.")
             }
             Thread.sleep(forTimeInterval: Double(milliseconds) / 1000)
+            return nil
 
         case let .open(app):
             try self.openApplication(app)
             selectorQueryInvalidateCaches()
+            return nil
 
         case let .close(app):
             try self.closeApplication(app)
             selectorQueryInvalidateCaches()
+            return nil
         }
     }
 
@@ -891,12 +934,12 @@ enum OXAExecutor {
         return CGPoint(x: frame.midX, y: frame.midY)
     }
 
-    private static func clickElementCenter(_ element: Element) throws {
+    private static func clickElementCenter(_ element: Element, button: MouseButton = .left) throws {
         guard let center = self.centerPoint(for: element) else {
             throw OXAActionError.runtime("Unable to resolve element frame for click.")
         }
         try self.movePointerToElementCenter(center)
-        try InputDriver.click(at: center)
+        try InputDriver.click(at: center, button: button)
     }
 
     private static func movePointerToElementCenter(_ point: CGPoint) throws {
@@ -953,14 +996,6 @@ enum OXAExecutor {
 
     private static func driverKeyName(for baseKey: String) -> String {
         switch baseKey {
-        case "arrow_up":
-            return "up"
-        case "arrow_down":
-            return "down"
-        case "arrow_left":
-            return "left"
-        case "arrow_right":
-            return "right"
         case "page_up":
             return "pageup"
         case "page_down":
@@ -1008,6 +1043,52 @@ enum OXAExecutor {
         }
 
         return true
+    }
+
+    private static func readAttributeValue(from element: Element, attributeName: String) -> String? {
+        let canonicalName = self.canonicalAttributeName(attributeName)
+
+        switch canonicalName {
+        case AXAttributeNames.kAXRoleAttribute:
+            return element.role()
+        case AXAttributeNames.kAXSubroleAttribute:
+            return element.subrole()
+        case AXAttributeNames.kAXPIDAttribute:
+            return element.pid().map(String.init)
+        case AXAttributeNames.kAXTitleAttribute:
+            return element.title()
+        case AXAttributeNames.kAXDescriptionAttribute:
+            return element.descriptionText()
+        case AXAttributeNames.kAXHelpAttribute:
+            return element.help()
+        case AXAttributeNames.kAXIdentifierAttribute:
+            return element.identifier()
+        case AXAttributeNames.kAXRoleDescriptionAttribute:
+            return element.roleDescription()
+        case AXAttributeNames.kAXPlaceholderValueAttribute:
+            return element.attribute(Attribute<String>(AXAttributeNames.kAXPlaceholderValueAttribute))
+        case AXAttributeNames.kAXEnabledAttribute:
+            return element.isEnabled().map { $0 ? "true" : "false" }
+        case AXAttributeNames.kAXFocusedAttribute:
+            return element.isFocused().map { $0 ? "true" : "false" }
+        case AXAttributeNames.kAXValueAttribute:
+            return SelectorMatchSummary.stringify(element.value())
+        case AXMiscConstants.computedNameAttributeKey:
+            return element.computedName()
+        case AXMiscConstants.isIgnoredAttributeKey:
+            return element.isIgnored() ? "true" : "false"
+        default:
+            break
+        }
+
+        guard let rawValue: Any = element.attribute(Attribute<Any>(canonicalName)) else {
+            return nil
+        }
+        return SelectorMatchSummary.stringify(rawValue)
+    }
+
+    private static func canonicalAttributeName(_ name: String) -> String {
+        PathUtils.attributeKeyMappings[name.lowercased()] ?? name
     }
 
     private static func openApplication(_ applicationIdentifier: String) throws {

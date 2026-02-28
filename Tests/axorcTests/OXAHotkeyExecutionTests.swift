@@ -27,7 +27,7 @@ struct OXAHotkeyExecutionTests {
         var dispatchedKeys: [String] = []
 
         try OXAExecutor.executeHotkey(
-            OXAHotkeyChord(modifiers: [], baseKey: "arrow_down"),
+            OXAHotkeyChord(modifiers: [], baseKey: "down"),
             targetPid: 42,
             dispatch: { keys, _ in
                 dispatchedKeys = keys
