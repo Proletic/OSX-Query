@@ -153,6 +153,12 @@ public enum InputDriver {
         try Element.typeText(text, delay: delayPerCharacter)
     }
 
+    /// Type a string targeted to a specific process id.
+    @MainActor
+    public static func type(_ text: String, targetPid: pid_t, delayPerCharacter: TimeInterval = 0.0) throws {
+        try Element.typeText(text, delay: delayPerCharacter, targetPid: targetPid)
+    }
+
     /// Tap a special key (e.g. return, tab) with optional modifiers.
     @MainActor
     public static func tapKey(_ key: SpecialKey, modifiers: CGEventFlags = []) throws {

@@ -60,6 +60,7 @@ enum OXAScrollDirection: String, Equatable {
 
 enum OXAStatement: Equatable {
     case sendText(text: String, targetRef: String)
+    case sendTextAsKeys(text: String, targetRef: String)
     case sendClick(targetRef: String)
     case sendDrag(sourceRef: String, targetRef: String)
     case sendHotkey(chord: OXAHotkeyChord, targetRef: String)
@@ -149,6 +150,12 @@ struct OXAParser {
             switch action {
             case "text":
                 let text = try self.expectString()
+                if self.consumeWordIfPresent("as") {
+                    _ = try self.expectWord("keys")
+                    _ = try self.expectWord("to")
+                    let targetRef = try self.expectElementReference()
+                    return .sendTextAsKeys(text: text, targetRef: targetRef)
+                }
                 _ = try self.expectWord("to")
                 let targetRef = try self.expectElementReference()
                 return .sendText(text: text, targetRef: targetRef)
@@ -310,6 +317,18 @@ struct OXAParser {
             guard case .plus = self.lookahead.kind else {
                 return false
             }
+            self.advance()
+            return true
+        }
+
+        private mutating func consumeWordIfPresent(_ expected: String) -> Bool {
+            guard case let .word(value) = self.lookahead.kind else {
+                return false
+            }
+            guard value.lowercased() == expected.lowercased() else {
+                return false
+            }
+
             self.advance()
             return true
         }
@@ -513,6 +532,7 @@ enum OXAExecutor {
         for statement in program.statements {
             switch statement {
             case let .sendText(_, targetRef),
+                 let .sendTextAsKeys(_, targetRef),
                  let .sendClick(targetRef),
                  let .sendHotkey(_, targetRef),
                  let .sendScroll(_, targetRef):
@@ -532,6 +552,8 @@ enum OXAExecutor {
         switch statement {
         case let .sendText(text, targetRef):
             return "send text \"\(text)\" to \(targetRef)"
+        case let .sendTextAsKeys(text, targetRef):
+            return "send text \"\(text)\" as keys to \(targetRef)"
         case let .sendClick(targetRef):
             return "send click to \(targetRef)"
         case let .sendDrag(sourceRef, targetRef):
@@ -561,6 +583,19 @@ enum OXAExecutor {
             guard target.setValue(text, forAttribute: AXAttributeNames.kAXValueAttribute) else {
                 throw OXAActionError.runtime("Failed to set AXValue on target element \(targetRef).")
             }
+
+        case let .sendTextAsKeys(text, targetRef):
+            let target = try self.resolveElementReference(targetRef)
+            self.preflightTargetElement(target)
+            guard self.focusTargetForInput(target) else {
+                throw OXAActionError.runtime("Failed to focus target element \(targetRef) for text input.")
+            }
+
+            let targetPid = SelectorActionRefStore.snapshotAppPID ?? self.owningPID(for: target)
+            guard let targetPid else {
+                throw OXAActionError.runtime("Unable to determine owning app for text input target \(targetRef).")
+            }
+            try self.executeTextAsKeys(text, targetPid: targetPid)
 
         case let .sendClick(targetRef):
             let target = try self.resolveElementReference(targetRef)
@@ -904,6 +939,16 @@ enum OXAExecutor {
     {
         let keys = chord.modifiers + [self.driverKeyName(for: chord.baseKey)]
         try dispatch(keys, targetPid)
+    }
+
+    static func executeTextAsKeys(
+        _ text: String,
+        targetPid: pid_t,
+        dispatch: (String, pid_t) throws -> Void = { value, pid in
+            try InputDriver.type(value, targetPid: pid, delayPerCharacter: 0)
+        }) throws
+    {
+        try dispatch(text, targetPid)
     }
 
     private static func driverKeyName(for baseKey: String) -> String {

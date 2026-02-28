@@ -8,6 +8,7 @@ struct OXAParserTests {
         let program = try OXAParser.parse(
             """
             send text "hello" to 28e6a93cf;
+            send text "typed" as keys to 28e6a93cf;
             send click to 89d32b48a;
             send drag 89d32b48a to 28e6a93cf;
             send hotkey cmd+shift+a to 28e6a93cf;
@@ -19,7 +20,14 @@ struct OXAParserTests {
             """
         )
 
-        #expect(program.statements.count == 9)
+        #expect(program.statements.count == 10)
+    }
+
+    @Test("Parses send text as keys statement")
+    func parsesSendTextAsKeysStatement() throws {
+        let program = try OXAParser.parse("send text \"hello world\" as keys to 28e6a93cf;")
+        #expect(program.statements.count == 1)
+        #expect(program.statements[0] == .sendTextAsKeys(text: "hello world", targetRef: "28e6a93cf"))
     }
 
     @Test("Rejects element references that are not 9 hex characters")

@@ -35,4 +35,21 @@ struct OXAHotkeyExecutionTests {
 
         #expect(dispatchedKeys == ["down"])
     }
+
+    @Test("Execute text as keys dispatches text to target pid")
+    func executeTextAsKeysDispatchesTextToTargetPid() throws {
+        var dispatchedText = ""
+        var dispatchedPid: pid_t = 0
+
+        try OXAExecutor.executeTextAsKeys(
+            "hello",
+            targetPid: 123,
+            dispatch: { text, pid in
+                dispatchedText = text
+                dispatchedPid = pid
+            })
+
+        #expect(dispatchedText == "hello")
+        #expect(dispatchedPid == 123)
+    }
 }

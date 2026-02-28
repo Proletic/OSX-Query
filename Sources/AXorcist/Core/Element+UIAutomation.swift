@@ -166,13 +166,19 @@ extension Element {
 
     /// Type text at current focus
     @MainActor public static func typeText(_ text: String, delay: TimeInterval = 0.005) throws {
+        try self.typeText(text, delay: delay, targetPid: nil)
+    }
+
+    /// Type text at current focus, optionally targeted to a specific process id.
+    @MainActor
+    public static func typeText(_ text: String, delay: TimeInterval = 0.005, targetPid: pid_t?) throws {
         for character in text {
             if character == "\n" {
-                try self.typeKey(.return)
+                try self.typeKey(.return, targetPid: targetPid)
             } else if character == "\t" {
-                try self.typeKey(.tab)
+                try self.typeKey(.tab, targetPid: targetPid)
             } else {
-                try self.typeCharacter(character)
+                try self.typeCharacter(character, targetPid: targetPid)
             }
 
             if delay > 0 {
@@ -183,6 +189,12 @@ extension Element {
 
     /// Type a single character
     @MainActor public static func typeCharacter(_ character: Character) throws {
+        try self.typeCharacter(character, targetPid: nil)
+    }
+
+    /// Type a single character, optionally targeted to a specific process id.
+    @MainActor
+    public static func typeCharacter(_ character: Character, targetPid: pid_t?) throws {
         let string = String(character)
 
         // Create keyboard event
@@ -205,9 +217,17 @@ extension Element {
         }
 
         // Post events
-        keyDown.post(tap: .cghidEventTap)
+        if let targetPid {
+            keyDown.postToPid(targetPid)
+        } else {
+            keyDown.post(tap: .cghidEventTap)
+        }
         Thread.sleep(forTimeInterval: 0.001)
-        keyUp.post(tap: .cghidEventTap)
+        if let targetPid {
+            keyUp.postToPid(targetPid)
+        } else {
+            keyUp.post(tap: .cghidEventTap)
+        }
     }
 
     /// Type a special key
