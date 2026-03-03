@@ -66,6 +66,7 @@ enum OXAStatement: Equatable {
     case sendDrag(sourceRef: String, targetRef: String)
     case sendHotkey(chord: OXAHotkeyChord, targetRef: String)
     case sendScroll(direction: OXAScrollDirection, targetRef: String)
+    case sendScrollIntoView(targetRef: String)
     case readAttribute(attributeName: String, targetRef: String)
     case sleep(milliseconds: Int)
     case open(app: String)
@@ -186,6 +187,11 @@ struct OXAParser {
                 let targetRef = try self.expectElementReference()
                 return .sendHotkey(chord: chord, targetRef: targetRef)
             case "scroll":
+                if self.consumeWordIfPresent("to") {
+                    let targetRef = try self.expectElementReference()
+                    return .sendScrollIntoView(targetRef: targetRef)
+                }
+
                 let rawDirection = try self.expectWord().lowercased()
                 guard let direction = OXAScrollDirection(rawValue: rawDirection) else {
                     throw self.parseError("Unsupported scroll direction '\(rawDirection)'.")
@@ -469,6 +475,7 @@ enum OXAExecutor {
     private static let processPollIntervalSeconds: TimeInterval = 0.01
     private static let appLaunchWaitTimeoutSeconds: TimeInterval = 2.0
     private static let windowCreationWaitTimeoutSeconds: TimeInterval = 1.0
+    private static let axScrollToVisibleAction = "AXScrollToVisible"
     private static var lastActivationFailureDescription: String?
 
     static func execute(programSource: String) throws -> String {
@@ -560,7 +567,8 @@ enum OXAExecutor {
                  let .sendClick(targetRef),
                  let .sendRightClick(targetRef),
                  let .sendHotkey(_, targetRef),
-                 let .sendScroll(_, targetRef):
+                 let .sendScroll(_, targetRef),
+                 let .sendScrollIntoView(targetRef):
                 references.append(targetRef)
             case let .sendDrag(sourceRef, targetRef):
                 references.append(sourceRef)
@@ -590,6 +598,8 @@ enum OXAExecutor {
             return "send hotkey \(hotkey) to \(targetRef)"
         case let .sendScroll(direction, targetRef):
             return "send scroll \(direction.rawValue) to \(targetRef)"
+        case let .sendScrollIntoView(targetRef):
+            return "send scroll to \(targetRef)"
         case let .readAttribute(attributeName, targetRef):
             return "read \(attributeName) from \(targetRef)"
         case let .sleep(milliseconds):
@@ -672,6 +682,11 @@ enum OXAExecutor {
             }
             try self.scroll(direction: direction, at: center)
             return nil
+
+        case let .sendScrollIntoView(targetRef):
+            let target = try self.resolveElementReference(targetRef)
+            self.preflightTargetElement(target)
+            return try self.scrollElementIntoView(target, targetRef: targetRef)
 
         case let .readAttribute(attributeName, targetRef):
             let target = try self.resolveElementReference(targetRef)
@@ -1162,6 +1177,21 @@ enum OXAExecutor {
             amount: amount,
             naturalScrollEnabled: self.isNaturalScrollEnabled())
         try InputDriver.scroll(deltaX: deltas.deltaX, deltaY: deltas.deltaY, at: point)
+    }
+
+    private static func scrollElementIntoView(_ element: Element, targetRef: String) throws -> String? {
+        if let actions = element.supportedActions(), !actions.contains(self.axScrollToVisibleAction) {
+            throw OXAActionError.runtime(
+                "AXScrollToVisible is not supported for \(targetRef).")
+        }
+
+        do {
+            _ = try element.performAction(self.axScrollToVisibleAction)
+            return nil
+        } catch {
+            throw OXAActionError.runtime(
+                "AXScrollToVisible failed for \(targetRef): \(String(describing: error))")
+        }
     }
 
     static func scrollDeltas(

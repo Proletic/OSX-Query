@@ -15,6 +15,7 @@ struct OXAParserTests {
             send hotkey cmd+shift+a to 28e6a93cf;
             send hotkey down to 984cb20ff;
             send scroll down to 984cb20ff;
+            send scroll to 984cb20ff;
             read CPName from 28e6a93cf;
             sleep 400;
             open "Helium";
@@ -22,7 +23,7 @@ struct OXAParserTests {
             """
         )
 
-        #expect(program.statements.count == 12)
+        #expect(program.statements.count == 13)
     }
 
     @Test("Parses send text as keys statement")
@@ -37,6 +38,13 @@ struct OXAParserTests {
         let program = try OXAParser.parse("send right click to 28e6a93cf;")
         #expect(program.statements.count == 1)
         #expect(program.statements[0] == .sendRightClick(targetRef: "28e6a93cf"))
+    }
+
+    @Test("Parses send scroll into view statement")
+    func parsesSendScrollIntoViewStatement() throws {
+        let program = try OXAParser.parse("send scroll to 28e6a93cf;")
+        #expect(program.statements.count == 1)
+        #expect(program.statements[0] == .sendScrollIntoView(targetRef: "28e6a93cf"))
     }
 
     @Test("Parses read attribute statement")
