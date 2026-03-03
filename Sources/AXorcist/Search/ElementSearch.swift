@@ -204,7 +204,7 @@ private func applyCriteriaSearch(
         criteria: locator.criteria,
         matchType: finalSearchMatchType,
         matchAllCriteria: finalSearchMatchAll,
-        stopAtFirstMatch: axorcStopAtFirstMatch,
+        stopAtFirstMatch: true,
         maxDepth: maxDepthForSearch)
 
     traverseAndSearch(
@@ -400,7 +400,7 @@ public func traverseAndSearch(
     enum VisitedSet { nonisolated(unsafe) static var set = Set<UInt>() }
 
     if let children = element.children(strict: false), !children.isEmpty,
-       axorcScanAll || (element.role().map { containerRoles.contains($0) } ?? false)
+       (element.role().map { containerRoles.contains($0) } ?? false)
     {
         // Abort if we are past the deadline
         if let deadline = traversalDeadline, Date() > deadline {
@@ -623,11 +623,3 @@ private nonisolated(unsafe) var traversalNodeCounter: Int = 0
 
 /// Default timeout (seconds) for a full tree traversal. Override at runtime by setting `axorcTraversalTimeout`.
 public nonisolated(unsafe) var axorcTraversalTimeout: TimeInterval = 30
-
-/// When true, traversal will ignore `containerRoles` pruning and descend into *every* child of every element.
-/// Enable via CLI flag `--scan-all`.
-public nonisolated(unsafe) var axorcScanAll: Bool = false
-
-/// Controls whether SearchVisitor should stop at the first element that satisfies the final locator criteria.
-/// CLI flag `--no-stop-first` sets this to `false`.
-public nonisolated(unsafe) var axorcStopAtFirstMatch: Bool = true

@@ -85,15 +85,6 @@ struct AXORCCommand: ParsableCommand {
         help: "Enable AXEnhancedUserInterface and AXManualAccessibility for a running bundle id. Temporarily focuses target app and restores original focus.")
     var enableAppAx: String?
 
-    @Option(name: .long, help: "Traversal timeout in seconds (overrides default 30).")
-    var timeout: Int?
-
-    @Flag(name: .long, help: "Traverse every node (ignore container role pruning). May be extremely slow.")
-    var scanAll: Bool = false
-
-    @Flag(name: .customLong("no-stop-first"), help: "Do not stop at first match; collect deeper matches as well.")
-    var noStopFirst: Bool = false
-
     @Flag(name: .customLong("selector-cache-daemon"), help: "Internal: run selector cache daemon.")
     var selectorCacheDaemon: Bool = false
 
@@ -204,7 +195,6 @@ struct AXORCCommand: ParsableCommand {
     @MainActor
     private mutating func runMain() throws {
         self.configureLogging()
-        self.applyGlobalFlags()
         self.logDebugVersion()
 
         if self.selectorCacheDaemon {
@@ -247,14 +237,6 @@ struct AXORCCommand: ParsableCommand {
         } else {
             GlobalAXLogger.shared.isLoggingEnabled = false
             GlobalAXLogger.shared.detailLevel = .minimal
-        }
-    }
-
-    private func applyGlobalFlags() {
-        axorcScanAll = self.scanAll
-        axorcStopAtFirstMatch = !self.noStopFirst
-        if let timeout {
-            axorcTraversalTimeout = TimeInterval(timeout)
         }
     }
 
@@ -531,8 +513,6 @@ extension AXORCCommand {
     mutating func apply(parsedValues: ParsedValues) throws {
         self.debug = parsedValues.flags.contains("debug")
         self.verbose = parsedValues.flags.contains("verbose")
-        self.scanAll = parsedValues.flags.contains("scanAll")
-        self.noStopFirst = parsedValues.flags.contains("noStopFirst")
         self.noColor = parsedValues.flags.contains("noColor")
         self.showPath = parsedValues.flags.contains("showPath")
         self.showNameSource = parsedValues.flags.contains("showNameSource")
@@ -540,13 +520,6 @@ extension AXORCCommand {
         self.useCached = parsedValues.flags.contains("useCached")
         self.interactive = parsedValues.flags.contains("interactive")
         self.selectorCacheDaemon = parsedValues.flags.contains("selectorCacheDaemon")
-
-        if let timeoutString = parsedValues.options["timeout"]?.last {
-            guard let timeoutValue = Int(timeoutString) else {
-                throw ValidationError("Invalid value for --timeout: \(timeoutString)")
-            }
-            self.timeout = timeoutValue
-        }
 
         if let maxDepthString = parsedValues.options["selectorMaxDepth"]?.last {
             guard let depthValue = Int(maxDepthString) else {
