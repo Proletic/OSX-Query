@@ -40,7 +40,8 @@ Useful aliases for matching:
 - Also useful: `role`, `title`, `value`, `description`, `identifier`, `enabled`, `focused`.
 
 Matching reminders:
-- String matching is case-sensitive.
+- String matching is case-sensitive for `=`, `^=`, and `$=`.
+- Fuzzy contains matching (`*=`) is case-insensitive.
 - Result de-duplication is by underlying AX element identity, not visible text.
 - Distinct elements can share similar names and still behave differently.
 
@@ -149,4 +150,3 @@ Query posture:
 - Start broad, then narrow with role + `CPName` + context.
 - Verify candidate sets before acting (`--limit`, then `--show-path` if needed).
 - Keep using `--use-cached` until an action or UI change occurs.
-

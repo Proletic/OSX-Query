@@ -323,7 +323,7 @@ private struct OXQEvaluator<Node: Hashable> {
         case .equals:
             return actualValue == attribute.value
         case .contains:
-            return actualValue.contains(attribute.value)
+            return actualValue.range(of: attribute.value, options: [.caseInsensitive]) != nil
         case .startsWith:
             return actualValue.hasPrefix(attribute.value)
         case .endsWith:

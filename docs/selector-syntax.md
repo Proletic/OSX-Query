@@ -55,7 +55,8 @@ relative_selector  := combinator? selector
 Important details:
 
 - Attribute values must be quoted.
-- Matching is case-sensitive.
+- Matching is case-sensitive for `=`, `^=`, and `$=`.
+- `*=` fuzzy contains matching is case-insensitive.
 - `*` is wildcard type selector.
 - Whitespace between compounds is treated as descendant combinator.
 - Results are de-duplicated across comma-separated selector groups and returned in traversal order.

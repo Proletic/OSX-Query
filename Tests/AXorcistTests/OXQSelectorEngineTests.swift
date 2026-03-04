@@ -36,15 +36,33 @@ struct OXQSelectorEngineTests {
 
         #expect(
             fixture.ids(try engine.findAll(
+                matching: #"AXStaticText[AXTitle*="spotify"]"#,
+                from: fixture.root,
+                maxDepth: 10)) == ["staticA"])
+
+        #expect(
+            fixture.ids(try engine.findAll(
                 matching: #"AXStaticText[AXTitle^="Spot"]"#,
                 from: fixture.root,
                 maxDepth: 10)) == ["staticA"])
+
+        #expect(
+            (try engine.findAll(
+                matching: #"AXStaticText[AXTitle^="spot"]"#,
+                from: fixture.root,
+                maxDepth: 10)).isEmpty)
 
         #expect(
             fixture.ids(try engine.findAll(
                 matching: #"AXStaticText[AXTitle$="Song"]"#,
                 from: fixture.root,
                 maxDepth: 10)) == ["staticA"])
+
+        #expect(
+            (try engine.findAll(
+                matching: #"AXStaticText[AXTitle$="song"]"#,
+                from: fixture.root,
+                maxDepth: 10)).isEmpty)
     }
 
     @Test("evaluates not pseudo")
