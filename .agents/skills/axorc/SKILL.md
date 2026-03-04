@@ -8,6 +8,7 @@ description: Use as a computer-use tool when an agent must interact with desktop
 ## Purpose
 
 Use AXORC as a computer-use tool when an agent must interact with desktop UIs, browser/web workflows, or UI-driven test flows used to validate other systems.
+When browser interaction is required, use the user's default browser unless the user explicitly asks for a specific browser.
 
 ## Mandatory Pre-Read (Do Not Skip)
 
