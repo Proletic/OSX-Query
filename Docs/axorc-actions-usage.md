@@ -1,9 +1,11 @@
-# AXORC OXQ Advanced Learnings (Query + Actions)
+# AXORC Actions Usage
 
 This guide is for readers with no prior chat context.
 It documents both APIs:
 - OXQ query API (`--app ... --selector ...`)
 - OXA actions API (`--actions '...'`)
+
+This file also captures practical defaults that worked repeatedly in live usage.
 
 ## 1. Current architecture
 - Query mode discovers elements and emits refs.
@@ -11,120 +13,31 @@ It documents both APIs:
 - Required lifecycle is `query+` then `action*`.
 - Ref actions do not execute against raw query stdout.
 - One global daemon is reused across calls.
+- Treat action success as transport-level only; always verify with a query or screenshot.
 
-## 2. OXQ query grammar (supported)
 
-Supported selector features:
-- Type selectors: role (`AXButton`) and wildcard (`*`)
-- Combinators: descendant (` `), child (`>`)
-- Attribute operators: `=`, `*=`, `^=`, `$=`
-- Pseudos: `:has(...)`, `:not(...)`
-- Selector lists: comma-separated OR
+## 2. Daily workflow (recommended)
+1. Query with `--cache-session` to warm/update refs.
+2. Run one short action program with those refs.
+3. Re-query with `--cache-session` after any UI-changing action.
+4. Use `--use-cached` only for back-to-back read-only follow-up queries.
 
-Practical grammar constraints:
-- Attribute values must be quoted strings.
-  - Invalid: `AXButton[enabled=true]`
-  - Valid: `AXButton[enabled="true"]`
-- One attribute group per compound.
-  - Invalid: `AXButton[CPName="x"][enabled="true"]`
-  - Valid: `AXButton[CPName="x",enabled="true"]`
-- Unknown pseudos are rejected.
-
-## 3. OXQ aliases and matching behavior
-
-Useful aliases for matching:
-- `CPName` (or `ComputedName`) is the most reliable text field.
-- Also useful: `role`, `title`, `value`, `description`, `identifier`, `enabled`, `focused`.
-
-Matching reminders:
-- String matching is case-sensitive.
-- Result de-duplication is by underlying AX element identity, not visible text.
-- Distinct elements can share similar names and still behave differently.
-
-## 4. Query command shape and options
-
-Core shape:
+Example:
 ```bash
-axorc --app <target> --selector "<query>" [options]
+# Warm refs on current UI
+axorc --app net.imput.helium --selector 'AXTextField,AXWebArea' --cache-session
+
+# Act
+axorc --actions 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
+
+# UI changed => refresh refs
+axorc --app net.imput.helium --selector 'AXWebArea,AXLink' --cache-session --limit 80
+
+# No action in between => use cached for fast refinement
+axorc --app net.imput.helium --selector 'AXLink[CPName*="In the news"]' --use-cached
 ```
 
-Most useful query options:
-- `--limit <n>`: reduce noise while exploring.
-- `--cache-session`: refresh/warm daemon snapshot from live UI.
-- `--use-cached`: run query against warm snapshot (no refresh).
-- `--show-path`: include full path for disambiguation.
-- `--show-name-source`: show computed-name source.
-- `--max-depth <n>`: optional traversal cap, use sparingly.
-
-Targeting tips:
-- Prefer bundle IDs for stable app targeting.
-- `focused` can be convenient for ad-hoc local checks.
-
-## 5. High-leverage query patterns
-
-Pattern 0: broad discovery pass
-```bash
-axorc --app <target> --selector 'AXTextField,AXTextArea,AXComboBox' --limit 80
-axorc --app <target> --selector '*[CPName*="<keyword>"]' --limit 80
-```
-
-Pattern A: refine then verify
-```bash
-axorc --app net.imput.helium \
-  --selector '*[CPName="In the news"]:not(AXStaticText)' \
-  --limit 20 --show-path
-```
-
-Pattern B: contextual targeting with `:has(...)`
-```bash
-axorc --app net.imput.helium \
-  --selector 'AXGroup:has(AXHeading[CPName="In the news"]) AXLink' \
-  --limit 120
-```
-
-Pattern C: exclusion hygiene with `:not(...)`
-```bash
-axorc --app net.imput.helium \
-  --selector 'AXLink[CPName*="Diddy Blud"]:not([CPName*="Go to channel"])'
-```
-
-Pattern D: role-first, text-second
-```bash
-AXButton[CPName^="Play"]:not([enabled="false"])
-```
-
-## 6. Using `:has(...)` effectively
-
-When to use it:
-- Parent-level targeting: find containers/windows with a descendant marker.
-- Context disambiguation: same label appears in multiple regions.
-- Relative structure matching: enforce direct-child shape with `>`.
-
-Core forms:
-```bash
-# Parent has any matching descendant
-AXWindow:has(AXTextArea[CPName*="Ask anything"])
-
-# Parent has direct child
-AXGroup:has(> AXTextArea[CPName*="Ask anything"])
-
-# Contextual result matching
-AXGroup:has(AXLink[CPName*="<context>"]) AXLink[CPName*="<target>"]
-```
-
-Tips:
-- Keep the inner selector specific (role + text/attribute).
-- If too broad, add another constraint or a `:not(...)`.
-
-## 7. Query workflow playbook
-1. Start with broad discovery (`AXTextField,AXTextArea,AXComboBox` or `*[CPName*="..."]`).
-2. Narrow with role + `CPName` + `:not(...)`.
-3. Add context with `:has(...)` when ambiguity remains.
-4. Verify candidate set (`--limit`, then `--show-path`).
-5. Warm refs with `--cache-session` before action phase.
-6. Use `--use-cached` for non-interaction follow-up queries only.
-
-## 8. `--actions` grammar reference
+## 3. `--actions` grammar reference
 
 An actions program is a semicolon-terminated statement list.
 
@@ -144,13 +57,29 @@ open "AppNameOrBundleID";
 close "AppNameOrBundleID";
 ```
 
+Action statements used most often:
+```bash
+# App lifecycle
+open "net.imput.helium";
+close "com.microsoft.Word";
+
+# Element actions
+send click to <ref>;
+send text "..." to <ref>;
+send text "..." as keys to <ref>;
+send hotkey cmd+a to <ref>;
+send scroll down to <ref>;
+send scroll to <ref>;
+sleep 100;
+```
+
 Ref format:
 - Exactly 9 hex chars (example: `063701895`).
 
 Note:
-- Clicks can sometimes miss, so its a good idea to try again, maybe with a more precise selector before completely changing approach.
+- Clicks can sometimes miss, so it's a good idea to try again, maybe with a more precise selector before completely changing approach.
 
-## 9. Hotkey spec (current)
+## 4. Hotkey spec (current)
 
 Format:
 ```txt
@@ -191,18 +120,18 @@ send hotkey cmd+down to 065701701;
 send hotkey shift+tab to 063701895;
 ```
 
-## 10. Text entry modes
+## 5. Text entry modes
 
 `send text "..." to <ref>;`
 - Good first attempt for standard text fields.
 - Uses focus fallback + value-setting behavior.
-- Can be unreliable in rich editors.
+- Can be unreliable in rich editors but should be the first attempt at typing.
 
 `send text "..." as keys to <ref>;`
 - Types like per-key input.
 - Preferred for rich editors and punctuation-sensitive content.
 
-## 10b. Additional action modes
+## 6. Additional action modes
 
 `send right click to <ref>;`
 - Right-clicks the element center (context menu path).
@@ -213,10 +142,10 @@ send hotkey shift+tab to 063701895;
 - If unavailable or it fails, action returns an explicit runtime error.
 
 `read <attributeName> from <ref>;`
-- Reads and prints the full attribute value. (can be ussful to grep from)
+- Reads and prints the full attribute value (can be useful to grep from).
 - Supports aliases including `CPName`.
 
-## 11. Cache, refs, and phase boundaries
+## 7. Cache, refs, and phase boundaries
 
 Best-practice policy:
 1. Start a phase with `--cache-session`.
@@ -231,13 +160,15 @@ query (--cache-session) -> action program -> query (--cache-session) -> ...
 Validated behavior:
 - `query+` then `action*` is strictly required for ref actions.
 - Refs are ephemeral and can go stale quickly.
+- `--use-cached` is ideal for non-interaction follow-up queries.
+- After any interaction or expected UI change, refresh with `--cache-session`.
 
-## 12. Timing strategy
+## 8. Timing strategy
 - Start with `sleep 100` for intra-program waits.
 - Avoid trailing sleeps by default.
 - Increase above 100 only when behavior proves unstable.
 
-## 13. Quoting and parser pitfalls
+## 9. Quoting and parser pitfalls
 - `send text` string literals are double-quoted.
 - Nested unescaped double quotes can break parsing.
 - For embedded quoted phrases, either escape carefully or use single quotes in content.
@@ -247,7 +178,7 @@ Example:
 axorc --actions "send text \"He stated deep concern for 'a significant number of children and civilians' ...\" as keys to 0637027b0;"
 ```
 
-## 14. Failure modes and fixes
+## 10. Failure modes and fixes
 - `No cached query snapshot available`
   - Run a new query with `--cache-session`.
 - `Unknown element reference`
@@ -261,7 +192,7 @@ axorc --actions "send text \"He stated deep concern for 'a significant number of
 - `AXScrollToVisible failed for <ref>: ...`
   - AX action failed at runtime; re-query and validate the ref and UI state.
 
-## 15. End-to-end starter template
+## 11. End-to-end starter template
 ```bash
 # 1) Warm refs from current UI
 axorc --app net.imput.helium \
@@ -282,7 +213,3 @@ axorc --actions 'send click to 072701121;'
 # 5) Continue with query/action loop
 axorc --app net.imput.helium --selector 'AXWebArea,AXHeading' --cache-session --limit 60
 ```
-
-## Advanced usage. 
-
-- In rare cases, to exfiltrate data from browsers, it can be useful to open dev tools
