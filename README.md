@@ -1,10 +1,10 @@
-# OSX-Query
+# OSXQuery
 
-OSX-Query is a macOS UI query language and CLI for inspecting and interacting with Accessibility trees.
+OSXQuery is a macOS UI query language and CLI for inspecting and interacting with Accessibility trees.
 
 ## What This Does
 
-OSX-Query gives you a selector-driven way to:
+OSXQuery gives you a selector-driven way to:
 
 - Query a running app's Accessibility tree with CSS-like selectors.
 - Filter by role, attributes, and structure (child/descendant relationships).
@@ -19,7 +19,7 @@ OSX-Query gives you a selector-driven way to:
 The current architecture is optimized around three practical goals:
 
 1. Faster, clearer UI targeting
-   OSX-Query replaces verbose locator-style matching with a compact selector language (`OXQParser`, `OXQSelectorEngine`).
+   OSXQuery replaces verbose locator-style matching with a compact selector language (`OXQParser`, `OXQSelectorEngine`).
 
 2. Better human workflow
    There is a dedicated interactive selector mode (`-i`) with query editing, result navigation, search, and inline interactions.
@@ -31,26 +31,26 @@ The current architecture is optimized around three practical goals:
 
 - macOS 14+
 - Swift 6.2 toolchain
-- Accessibility permissions for the process running `axorc`
+- Accessibility permissions for the process running `osq`
 
 ## Installation
 
 ### Homebrew
 
-This repo includes a formula at `Formula/axorc.rb`.
+This repo includes a formula at `Formula/osq.rb`.
 
 Quick install:
 
 ```bash
 brew tap moulik-budhiraja/osx-query https://github.com/Moulik-Budhiraja/OSX-Query
-brew install --HEAD moulik-budhiraja/osx-query/axorc
+brew install --HEAD moulik-budhiraja/osx-query/osq
 ```
 
 Install from a local checkout:
 
 ```bash
-brew tap moulik-budhiraja/osx-query /absolute/path/to/OSX-Query
-brew install --HEAD moulik-budhiraja/osx-query/axorc
+brew tap moulik-budhiraja/osx-query /absolute/path/to/OSXQuery
+brew install --HEAD moulik-budhiraja/osx-query/osq
 ```
 
 Note: because there are currently no git tags, the formula is head-only and tracks `main`.
@@ -62,10 +62,10 @@ Note: because there are currently no git tags, the formula is head-only and trac
 swift build
 
 # Show help
-swift run axorc --help
+swift run osq --help
 
 # Query example
-swift run axorc --app focused --selector "AXWindow AXButton" --limit 20
+swift run osq --app focused --selector "AXWindow AXButton" --limit 20
 ```
 
 ## Accessibility Permissions
@@ -85,21 +85,21 @@ Primary modes:
 1. Selector query mode
 
 ```bash
-axorc --app <target> --selector "<query>" [options]
+osq --app <target> --selector "<query>" [options]
 ```
 
 2. Interactive selector mode
 
 ```bash
-axorc --app <target> --selector -i
+osq --app <target> --selector -i
 # or
-axorc --app <target> -i
+osq --app <target> -i
 ```
 
 3. AX exposure mode
 
 ```bash
-axorc --enable-ax <bundle-id>
+osq --enable-ax <bundle-id>
 ```
 
 ### App Target Resolution (`--app`)
@@ -138,13 +138,13 @@ Quick examples:
 
 ```bash
 # All buttons under any window
-axorc --app TextEdit --selector "AXWindow AXButton"
+osq --app TextEdit --selector "AXWindow AXButton"
 
 # Parent that has a direct child text field
-axorc --app TextEdit --selector "AXGroup:has(> AXTextField)"
+osq --app TextEdit --selector "AXGroup:has(> AXTextField)"
 
 # Disjunction
-axorc --app TextEdit --selector "AXTextArea, AXTextField, AXComboBox"
+osq --app TextEdit --selector "AXTextArea, AXTextField, AXComboBox"
 ```
 
 Selector mode output format:
@@ -165,7 +165,7 @@ Use:
 
 ## Library Usage (Swift)
 
-The query app integration (`~/dev/axorcistqueryapp`) uses:
+The query app integration (`~/dev/osxqueryapp`) uses:
 
 - `OXQParser` for syntax parsing
 - `OXQSelectorEngine` for selector evaluation
@@ -174,7 +174,7 @@ The query app integration (`~/dev/axorcistqueryapp`) uses:
 Minimal parser example:
 
 ```swift
-import AXorcist
+import OSXQuery
 
 let ast = try OXQParser().parse("AXGroup:has(> AXTextField) AXButton")
 print(ast.selectors.count)
@@ -183,7 +183,7 @@ print(ast.selectors.count)
 Selector evaluation example:
 
 ```swift
-import AXorcist
+import OSXQuery
 
 @MainActor
 func runSelectorQuery() throws {
@@ -234,4 +234,4 @@ func runSelectorQuery() throws {
 }
 ```
 
-The command-envelope API (`AXorcist.shared.runCommand(...)`) remains available, but selector mode and the query app both use the selector engine path above.
+The command-envelope API (`OSXQuery.shared.runCommand(...)`) remains available, but selector mode and the query app both use the selector engine path above.

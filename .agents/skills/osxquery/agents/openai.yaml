@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSXQuery"
+  short_description: "Operate the osq CLI safely for query/action UI automation"
+  default_prompt: "Read both OSXQuery usage docs in full before running commands. Use query-then-action loops, refresh refs after UI changes, and require screenshot verification before and after meaningful state transitions."

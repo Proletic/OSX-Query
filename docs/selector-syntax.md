@@ -1,30 +1,30 @@
 # Selector Syntax
 
-This document contains the full `--selector` syntax reference for `axorc`.
+This document contains the full `--selector` syntax reference for `osq`.
 
 ## Quick Examples
 
 ```bash
 # All buttons under any window
-axorc --app TextEdit --selector "AXWindow AXButton"
+osq --app TextEdit --selector "AXWindow AXButton"
 
 # Direct child text field
-axorc --app TextEdit --selector "AXGroup > AXTextField"
+osq --app TextEdit --selector "AXGroup > AXTextField"
 
 # Attribute contains
-axorc --app TextEdit --selector "AXButton[AXTitle*=\"Save\"]"
+osq --app TextEdit --selector "AXButton[AXTitle*=\"Save\"]"
 
 # Match by computed name alias (CPName)
-axorc --app TextEdit --selector "*[CPName*=\"Save\"]"
+osq --app TextEdit --selector "*[CPName*=\"Save\"]"
 
 # Parent that has a direct child text field
-axorc --app TextEdit --selector "AXGroup:has(> AXTextField)"
+osq --app TextEdit --selector "AXGroup:has(> AXTextField)"
 
 # Exclude matches
-axorc --app TextEdit --selector "AXTextArea:not([AXValue*=\"draft\"])"
+osq --app TextEdit --selector "AXTextArea:not([AXValue*=\"draft\"])"
 
 # Disjunction
-axorc --app TextEdit --selector "AXTextArea, AXTextField, AXComboBox"
+osq --app TextEdit --selector "AXTextArea, AXTextField, AXComboBox"
 ```
 
 ## Grammar (Practical)

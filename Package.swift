@@ -11,13 +11,13 @@ let approachableConcurrencySettings: [SwiftSetting] = [
 ]
 
 let package = Package(
-    name: "axPackage", // Renamed package slightly to avoid any confusion with executable name
+    name: "OSXQuery",
     platforms: [
         .macOS(.v14),
     ],
     products: [
-        .library(name: "AXorcist", targets: ["AXorcist"]), // Product 'AXorcist' now comes from target 'AXorcist'
-        .executable(name: "axorc", targets: ["axorc"]), // Product 'axorc' comes from target 'axorc'
+        .library(name: "OSXQuery", targets: ["OSXQuery"]),
+        .executable(name: "osq", targets: ["osq"]),
     ],
     dependencies: [
         .package(url: "https://github.com/steipete/Commander.git", exact: "0.2.1"),
@@ -25,40 +25,39 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "AXorcist",
+            name: "OSXQuery",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"), // Added Logging product from swift-log
+                .product(name: "Logging", package: "swift-log"),
             ],
-            path: "Sources/AXorcist", // Be very direct about the source path
-            exclude: [], // Explicitly no excludes
-            sources: nil, // Explicitly let SPM find all sources in the path
+            path: "Sources/OSXQuery",
+            exclude: [],
+            sources: nil,
             swiftSettings: approachableConcurrencySettings
         ),
         .executableTarget(
-            name: "axorc", // Executable target name
+            name: "osq",
             dependencies: [
-                "AXorcist", // Dependency restored to AXorcist
+                "OSXQuery",
                 .product(name: "Commander", package: "Commander"),
             ],
-            path: "Sources/axorc", // Explicit path
+            path: "Sources/osq",
             swiftSettings: approachableConcurrencySettings
         ),
         .testTarget(
-            name: "AXorcistTests",
+            name: "OSXQueryTests",
             dependencies: [
-                "AXorcist", // Dependency restored to AXorcist
+                "OSXQuery",
             ],
-            path: "Tests/AXorcistTests", // Explicit path
+            path: "Tests/OSXQueryTests",
             swiftSettings: approachableConcurrencySettings
-            // Sources will be inferred by SPM
         ),
         .testTarget(
-            name: "axorcTests",
+            name: "osqTests",
             dependencies: [
-                "axorc",
-                "AXorcist",
+                "osq",
+                "OSXQuery",
             ],
-            path: "Tests/axorcTests",
+            path: "Tests/osqTests",
             swiftSettings: approachableConcurrencySettings
         ),
     ],

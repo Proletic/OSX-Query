@@ -1,4 +1,0 @@
-interface:
-  display_name: "AXORC"
-  short_description: "Operate AXORC safely for query/action UI automation"
-  default_prompt: "Read both AXORC usage docs in full before running commands. Use query-then-action loops, refresh refs after UI changes, and require screenshot verification before and after meaningful state transitions."

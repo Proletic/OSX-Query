@@ -3,7 +3,7 @@
 ## Selector Query Mode
 
 ```bash
-axorc --app <target> --selector "<query>" [options]
+osq --app <target> --selector "<query>" [options]
 ```
 
 Common options:
@@ -21,15 +21,15 @@ Common options:
 Example:
 
 ```bash
-axorc --app TextEdit --selector "AXWindow AXButton" --limit 20 --show-path
+osq --app TextEdit --selector "AXWindow AXButton" --limit 20 --show-path
 ```
 
 ## Interactive Selector Mode
 
 ```bash
-axorc --app <target> -i
+osq --app <target> -i
 # or
-axorc --app <target> --selector -i
+osq --app <target> --selector -i
 ```
 
 Interactive mode opens a full-screen TUI for editing selectors, running queries, navigating results, and triggering inline actions.
@@ -40,10 +40,10 @@ Run OXA actions against cached references from a previous cache-daemon query.
 
 ```bash
 # 1) Build/refresh snapshot and refs
-axorc --app TextEdit --selector "AXButton" --cache-session
+osq --app TextEdit --selector "AXButton" --cache-session
 
 # 2) Execute OXA program against ref ids from query output (ref=...)
-axorc --actions 'send click to 28e6a93cf;'
+osq --actions 'send click to 28e6a93cf;'
 ```
 
 Notes:
@@ -54,7 +54,7 @@ Notes:
 ## AX Exposure Mode
 
 ```bash
-axorc --enable-ax com.apple.TextEdit
+osq --enable-ax com.apple.TextEdit
 ```
 
 This temporarily focuses the app, applies `AXEnhancedUserInterface=true` and `AXManualAccessibility=true`, then restores previous focus.
@@ -62,8 +62,8 @@ This temporarily focuses the app, applies `AXEnhancedUserInterface=true` and `AX
 ## Logging And Help
 
 ```bash
-axorc --help
-axorc help
-axorc --app focused --selector "AXWindow" --debug
-axorc --app focused --selector "AXWindow" --verbose
+osq --help
+osq help
+osq --app focused --selector "AXWindow" --debug
+osq --app focused --selector "AXWindow" --verbose
 ```
