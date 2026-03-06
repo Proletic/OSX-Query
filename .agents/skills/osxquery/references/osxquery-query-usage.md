@@ -50,13 +50,13 @@ Matching reminders:
 
 Core shape:
 ```bash
-osq --app <target> --selector "<query>" [options]
+osx --app <target> --selector "<query>" [options]
 ```
 
 Actions-first quick shape:
 ```bash
-osq --app <target> --selector "<query>" [--cache-session|--use-cached] [--limit N]
-osq --actions '<statement>; <statement>; ...'
+osx --app <target> --selector "<query>" [--cache-session|--use-cached] [--limit N]
+osx --actions '<statement>; <statement>; ...'
 ```
 
 Most useful query options:
@@ -78,27 +78,27 @@ Targeting tips:
 
 Pattern 0: broad discovery pass
 ```bash
-osq --app <target> --selector 'AXTextField,AXTextArea,AXComboBox' --limit 80
-osq --app <target> --selector '*[CPName*="<keyword>"]' --limit 80
+osx --app <target> --selector 'AXTextField,AXTextArea,AXComboBox' --limit 80
+osx --app <target> --selector '*[CPName*="<keyword>"]' --limit 80
 ```
 
 Pattern A: refine then verify
 ```bash
-osq --app net.imput.helium \
+osx --app net.imput.helium \
   --selector '*[CPName="In the news"]:not(AXStaticText)' \
   --limit 20 --show-path
 ```
 
 Pattern B: contextual targeting with `:has(...)`
 ```bash
-osq --app net.imput.helium \
+osx --app net.imput.helium \
   --selector 'AXGroup:has(AXHeading[CPName="In the news"]) AXLink' \
   --limit 120
 ```
 
 Pattern C: exclusion hygiene with `:not(...)`
 ```bash
-osq --app net.imput.helium \
+osx --app net.imput.helium \
   --selector 'AXLink[CPName*="Diddy Blud"]:not([CPName*="Go to channel"])'
 ```
 

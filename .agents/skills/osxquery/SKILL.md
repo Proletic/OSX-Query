@@ -1,6 +1,6 @@
 ---
 name: osxquery
-description: Use OSXQuery when an agent must interact with desktop UIs, web apps, or browser workflows via the `osq` CLI. Apply it for querying UI element trees, resolving stable references, and executing actions with verification; also use it in automated tests where UI interaction is required to validate other systems or end-to-end behavior. Enforce screenshot-first verification for meaningful state changes and non-undoable actions.
+description: Use OSXQuery when an agent must interact with desktop UIs, web apps, or browser workflows via the `osx` CLI. Apply it for querying UI element trees, resolving stable references, and executing actions with verification; also use it in automated tests where UI interaction is required to validate other systems or end-to-end behavior. Enforce screenshot-first verification for meaningful state changes and non-undoable actions.
 ---
 
 # OSXQuery
@@ -12,11 +12,11 @@ When browser interaction is required, use the user's default browser unless the 
 
 ## Mandatory Pre-Read (Do Not Skip)
 
-Read both documents in full before executing any `osq` command:
+Read both documents in full before executing any `osx` command:
 - [OSXQuery Query Usage](references/osxquery-query-usage.md)
 - [OSXQuery Actions Usage](references/osxquery-actions-usage.md)
 
-If either file is missing at these relative paths, stop and locate them first. Do not execute `osq` until both are read completely.
+If either file is missing at these relative paths, stop and locate them first. Do not execute `osx` until both are read completely.
 Treat those two usage docs as the source of truth for all command syntax, workflow sequencing, and troubleshooting details.
 
 ## Screenshot-First Policy (Required)

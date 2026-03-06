@@ -162,7 +162,7 @@ enum SelectorCacheDaemonServer {
 @MainActor
 struct SelectorCacheDaemonClient {
     static func defaultSocketPath() -> String {
-        "/tmp/osq-selector-cache-\(getuid()).sock"
+        "/tmp/osx-selector-cache-\(getuid()).sock"
     }
 
     func execute(request: SelectorQueryRequest) throws -> String {

@@ -89,12 +89,12 @@ public class GlobalAXLogger {
     private let maxMessageLength: Int = 300
 
     private static let jsonInitializationMessage = """
-    {"osq_log_stream_type": "json_objects",
+    {"osx_log_stream_type": "json_objects",
      "status": "AXGlobalLogger initialized with JSON output to stderr."}
     """
 
     private func shouldEnableJSONLogging() -> Bool {
-        guard let envVar = ProcessInfo.processInfo.environment["OSQ_JSON_LOG_ENABLED"] else { return false }
+        guard let envVar = ProcessInfo.processInfo.environment["OSX_JSON_LOG_ENABLED"] else { return false }
         return envVar.lowercased() == "true"
     }
 

@@ -1,24 +1,24 @@
 import Foundation
 @preconcurrency import Commander
 
-enum OSQHelpFormatter {
+enum OSXHelpFormatter {
     static func render() -> String {
-        let description = OSQCommand.commandDescription
-        let command = OSQCommand()
+        let description = OSXCommand.commandDescription
+        let command = OSXCommand()
         let signature = CommandSignature.describe(command).flattened()
 
         var lines: [String] = []
-        lines.append("osq")
+        lines.append("osx")
         if !description.abstract.isEmpty {
             lines.append(description.abstract)
         }
         lines.append("")
         lines.append("USAGE")
-        lines.append("  osq --app <target> --selector <query> [options]")
-        lines.append("  osq --app <target> --selector -i [options]")
-        lines.append("  osq --enable-ax <bundle-id> [options]")
-        lines.append("  osq --help")
-        lines.append("  osq help")
+        lines.append("  osx --app <target> --selector <query> [options]")
+        lines.append("  osx --app <target> --selector -i [options]")
+        lines.append("  osx --enable-ax <bundle-id> [options]")
+        lines.append("  osx --help")
+        lines.append("  osx help")
 
         if !description.usageExamples.isEmpty {
             lines.append("")

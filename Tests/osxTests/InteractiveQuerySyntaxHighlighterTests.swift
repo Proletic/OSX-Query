@@ -1,5 +1,5 @@
 import Testing
-@testable import osq
+@testable import osx
 
 @Suite("Interactive Query Syntax Highlighter")
 struct InteractiveQuerySyntaxHighlighterTests {

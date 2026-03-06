@@ -1,5 +1,5 @@
 import Testing
-@testable import osq
+@testable import osx
 
 @Suite("Selector Query Runner")
 struct SelectorQueryRunnerTests {

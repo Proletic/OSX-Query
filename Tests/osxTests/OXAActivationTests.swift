@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import osq
+@testable import osx
 
 @Suite("OXA Activation")
 @MainActor

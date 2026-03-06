@@ -31,26 +31,26 @@ The current architecture is optimized around three practical goals:
 
 - macOS 14+
 - Swift 6.2 toolchain
-- Accessibility permissions for the process running `osq`
+- Accessibility permissions for the process running `osx`
 
 ## Installation
 
 ### Homebrew
 
-This repo includes a formula at `Formula/osq.rb`.
+This repo includes a formula at `Formula/osx.rb`.
 
 Quick install:
 
 ```bash
 brew tap moulik-budhiraja/osx-query https://github.com/Moulik-Budhiraja/OSX-Query
-brew install --HEAD moulik-budhiraja/osx-query/osq
+brew install --HEAD moulik-budhiraja/osx-query/osx
 ```
 
 Install from a local checkout:
 
 ```bash
 brew tap moulik-budhiraja/osx-query /absolute/path/to/OSXQuery
-brew install --HEAD moulik-budhiraja/osx-query/osq
+brew install --HEAD moulik-budhiraja/osx-query/osx
 ```
 
 Note: because there are currently no git tags, the formula is head-only and tracks `main`.
@@ -62,10 +62,10 @@ Note: because there are currently no git tags, the formula is head-only and trac
 swift build
 
 # Show help
-swift run osq --help
+swift run osx --help
 
 # Query example
-swift run osq --app focused --selector "AXWindow AXButton" --limit 20
+swift run osx --app focused --selector "AXWindow AXButton" --limit 20
 ```
 
 ## Accessibility Permissions
@@ -85,21 +85,21 @@ Primary modes:
 1. Selector query mode
 
 ```bash
-osq --app <target> --selector "<query>" [options]
+osx --app <target> --selector "<query>" [options]
 ```
 
 2. Interactive selector mode
 
 ```bash
-osq --app <target> --selector -i
+osx --app <target> --selector -i
 # or
-osq --app <target> -i
+osx --app <target> -i
 ```
 
 3. AX exposure mode
 
 ```bash
-osq --enable-ax <bundle-id>
+osx --enable-ax <bundle-id>
 ```
 
 ### App Target Resolution (`--app`)
@@ -138,13 +138,13 @@ Quick examples:
 
 ```bash
 # All buttons under any window
-osq --app TextEdit --selector "AXWindow AXButton"
+osx --app TextEdit --selector "AXWindow AXButton"
 
 # Parent that has a direct child text field
-osq --app TextEdit --selector "AXGroup:has(> AXTextField)"
+osx --app TextEdit --selector "AXGroup:has(> AXTextField)"
 
 # Disjunction
-osq --app TextEdit --selector "AXTextArea, AXTextField, AXComboBox"
+osx --app TextEdit --selector "AXTextArea, AXTextField, AXComboBox"
 ```
 
 Selector mode output format:

@@ -1,4 +1,4 @@
-// OSQMain.swift - Main entry point for OSQ CLI
+// OSXMain.swift - Main entry point for OSX CLI
 
 import AppKit
 import OSXQuery
@@ -6,29 +6,29 @@ import OSXQuery
 import Foundation
 
 @main
-struct OSQCommand: ParsableCommand {
+struct OSXCommand: ParsableCommand {
     static func main() async {
-        let code = await OSQCLIEntrypoint.run(arguments: Array(CommandLine.arguments.dropFirst()))
+        let code = await OSXCLIEntrypoint.run(arguments: Array(CommandLine.arguments.dropFirst()))
         Foundation.exit(code)
     }
 
     @preconcurrency nonisolated static var commandDescription: CommandDescription {
-        let version = MainActor.assumeIsolated { osqVersion }
+        let version = MainActor.assumeIsolated { osxVersion }
         return CommandDescription(
-            commandName: "osq",
-            abstract: "OSQ CLI - OXQ selector query mode. Version \(version)",
+            commandName: "osx",
+            abstract: "OSX CLI - OXQ selector query mode. Version \(version)",
             usageExamples: [
                 CommandUsageExample(
-                    command: "osq --app com.apple.TextEdit --selector \"AXTextArea\"",
+                    command: "osx --app com.apple.TextEdit --selector \"AXTextArea\"",
                     description: "Query an app with the OXQ selector language."),
                 CommandUsageExample(
-                    command: "osq --app com.apple.TextEdit --selector -i",
+                    command: "osx --app com.apple.TextEdit --selector -i",
                     description: "Open the interactive full-screen query TUI."),
                 CommandUsageExample(
-                    command: "osq --enable-ax com.apple.TextEdit",
+                    command: "osx --enable-ax com.apple.TextEdit",
                     description: "Temporarily focus an app and apply AX exposure attributes."),
                 CommandUsageExample(
-                    command: "osq --actions 'send click to 28e6a93cf;'",
+                    command: "osx --actions 'send click to 28e6a93cf;'",
                     description: "Execute OXA actions against refs from the cache daemon (query+ then action*)."),
             ])
     }
@@ -152,10 +152,10 @@ struct OSQCommand: ParsableCommand {
 
     private func logDebugVersion() {
         guard self.debug || self.verbose else { return }
-        let version = MainActor.assumeIsolated { osqVersion }
+        let version = MainActor.assumeIsolated { osxVersion }
         fputs(
             logSegments(
-                "OSQMain.run: osq version \(version) build \(osqBuildStamp)",
+                "OSXMain.run: osx version \(version) build \(osxBuildStamp)",
                 "Detail level: \(GlobalAXLogger.shared.detailLevel).") + "\n",
             stderr)
     }
@@ -301,7 +301,7 @@ struct OSQCommand: ParsableCommand {
 
 // MARK: - Commander Parsing
 
-extension OSQCommand {
+extension OSXCommand {
     static func parseCommandLineArguments(arguments: [String]) throws -> ParsedValues {
         let prototype = Self()
         let signature = CommandSignature.describe(prototype)

@@ -28,7 +28,7 @@ enum LiveSelectorQueryExecutor {
         let roleByReference: [String: String]
     }
 
-    private static let cacheReferenceAttributeName = "__osq_ref"
+    private static let cacheReferenceAttributeName = "__osx_ref"
     private static var prefetchCache: SelectorPrefetchCacheEntry?
 
     static func execute(_ request: SelectorQueryRequest) throws -> SelectorQueryResult

@@ -36,7 +36,7 @@ struct AnyDecodable: Decodable {
 struct ApplicationQueryTests {
     @Test("Collect all running applications", .tags(.safe))
     func getAllApplications() async throws {
-        let result = try runOSQCommand(arguments: [
+        let result = try runOSXCommand(arguments: [
             "--app", "focused",
             "--selector", "AXApplication",
             "--max-depth", "1",
@@ -66,7 +66,7 @@ struct ApplicationQueryTests {
 
         try await Task.sleep(for: .seconds(1))
 
-        let result = try runOSQCommand(arguments: [
+        let result = try runOSXCommand(arguments: [
             "--app", "TextEdit",
             "--selector", "AXWindow",
             "--limit", "10",
@@ -102,7 +102,7 @@ struct ApplicationQueryTests {
         let preQueryFrontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
         #expect(preQueryFrontmostPid != textEditPid, "Expected another app to be frontmost before query.")
 
-        let result = try runOSQCommand(arguments: [
+        let result = try runOSXCommand(arguments: [
             "--app", "com.apple.TextEdit",
             "--selector", "AXTextArea",
             "--limit", "1",
@@ -118,7 +118,7 @@ struct ApplicationQueryTests {
 
     @Test("Query non-existent application", .tags(.safe))
     func queryNonExistentApp() async throws {
-        let result = try runOSQCommand(arguments: [
+        let result = try runOSXCommand(arguments: [
             "--app", "NonExistentApp12345",
             "--selector", "*",
         ])

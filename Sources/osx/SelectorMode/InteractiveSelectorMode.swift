@@ -178,7 +178,7 @@ private final class InteractiveSelectorSession {
         var lines: [String] = []
         var cursorPosition: (row: Int, col: Int)?
 
-        lines.append(self.headerLine("osq interactive app=\(self.request.appIdentifier) max_depth=\(self.maxDepthLabel())"))
+        lines.append(self.headerLine("osx interactive app=\(self.request.appIdentifier) max_depth=\(self.maxDepthLabel())"))
 
         switch self.mode {
         case .query:

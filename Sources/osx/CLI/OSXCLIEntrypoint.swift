@@ -1,16 +1,16 @@
 import Foundation
 @preconcurrency import Commander
 
-enum OSQCLIEntrypoint {
+enum OSXCLIEntrypoint {
     static func run(arguments: [String]) async -> Int32 {
-        if OSQHelpRequestDetector.isHelpRequest(arguments: arguments) {
-            print(OSQHelpFormatter.render())
+        if OSXHelpRequestDetector.isHelpRequest(arguments: arguments) {
+            print(OSXHelpFormatter.render())
             return ExitCode.success.rawValue
         }
 
         do {
-            let parsedValues = try OSQCommand.parseCommandLineArguments(arguments: arguments)
-            var command = OSQCommand()
+            let parsedValues = try OSXCommand.parseCommandLineArguments(arguments: arguments)
+            var command = OSXCommand()
             try command.apply(parsedValues: parsedValues)
             try await command.run()
             return ExitCode.success.rawValue
@@ -30,12 +30,12 @@ enum OSQCLIEntrypoint {
 
     private static func printError(message: String) {
         fputs("error: \(message)\n", stderr)
-        fputs("Run `osq --help` for usage.\n", stderr)
+        fputs("Run `osx --help` for usage.\n", stderr)
         fflush(stderr)
     }
 }
 
-private enum OSQHelpRequestDetector {
+private enum OSXHelpRequestDetector {
     static func isHelpRequest(arguments: [String]) -> Bool {
         if arguments.contains("--help") || arguments.contains("-h") {
             return true

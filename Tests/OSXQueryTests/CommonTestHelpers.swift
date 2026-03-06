@@ -171,11 +171,11 @@ func closeTextEdit() async {
     }
 }
 
-func runOSQCommand(arguments: [String]) throws -> CommandResult {
-    let osqUrl = productsDirectory.appendingPathComponent("osq")
+func runOSXCommand(arguments: [String]) throws -> CommandResult {
+    let osxURL = productsDirectory.appendingPathComponent("osx")
 
     let process = Process()
-    process.executableURL = osqUrl
+    process.executableURL = osxURL
     process.arguments = arguments
 
     let outputPipe = Pipe()
@@ -237,7 +237,7 @@ var productsDirectory: URL {
     ]
 
     let fileManager = FileManager.default
-    for path in buildPathsToTry where fileManager.fileExists(atPath: path.appendingPathComponent("osq").path) {
+    for path in buildPathsToTry where fileManager.fileExists(atPath: path.appendingPathComponent("osx").path) {
         return path
     }
 

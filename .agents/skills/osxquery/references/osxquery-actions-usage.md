@@ -25,16 +25,16 @@ This file also captures practical defaults that worked repeatedly in live usage.
 Example:
 ```bash
 # Warm refs on current UI
-osq --app net.imput.helium --selector 'AXTextField,AXWebArea' --cache-session
+osx --app net.imput.helium --selector 'AXTextField,AXWebArea' --cache-session
 
 # Act
-osq --actions 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
+osx --actions 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
 
 # UI changed => refresh refs
-osq --app net.imput.helium --selector 'AXWebArea,AXLink' --cache-session --limit 80
+osx --app net.imput.helium --selector 'AXWebArea,AXLink' --cache-session --limit 80
 
 # No action in between => use cached for fast refinement
-osq --app net.imput.helium --selector 'AXLink[CPName*="In the news"]' --use-cached
+osx --app net.imput.helium --selector 'AXLink[CPName*="In the news"]' --use-cached
 ```
 
 ## 3. `--actions` grammar reference
@@ -175,7 +175,7 @@ Validated behavior:
 
 Example:
 ```bash
-osq --actions "send text \"He stated deep concern for 'a significant number of children and civilians' ...\" as keys to 0637027b0;"
+osx --actions "send text \"He stated deep concern for 'a significant number of children and civilians' ...\" as keys to 0637027b0;"
 ```
 
 ## 10. Failure modes and fixes
@@ -195,21 +195,21 @@ osq --actions "send text \"He stated deep concern for 'a significant number of c
 ## 11. End-to-end starter template
 ```bash
 # 1) Warm refs from current UI
-osq --app net.imput.helium \
+osx --app net.imput.helium \
   --selector 'AXTextField[AXDescription*="Address and search bar"],AXWebArea' \
   --cache-session --limit 20
 
 # 2) Navigate
-osq --actions 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
+osx --actions 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
 
 # 3) Re-query after UI change
-osq --app net.imput.helium \
+osx --app net.imput.helium \
   --selector 'AXHeading[CPName="In the news"],AXLink' \
   --cache-session --limit 200
 
 # 4) Click target link
-osq --actions 'send click to 072701121;'
+osx --actions 'send click to 072701121;'
 
 # 5) Continue with query/action loop
-osq --app net.imput.helium --selector 'AXWebArea,AXHeading' --cache-session --limit 60
+osx --app net.imput.helium --selector 'AXWebArea,AXHeading' --cache-session --limit 60
 ```
