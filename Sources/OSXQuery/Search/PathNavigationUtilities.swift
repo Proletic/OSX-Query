@@ -21,11 +21,18 @@ public func getApplicationElement(for bundleIdentifier: String) -> Element? {
         + "\(bundleIdentifier)'."
     logPathNavigation(.debug, attemptMessage)
 
-    guard let runningApp = NSWorkspace.shared.runningApplications.first(where: {
-        $0.bundleIdentifier == bundleIdentifier
-    }) else {
+    let trimmedBundleIdentifier = bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    let runningApp =
+        NSRunningApplication.runningApplications(withBundleIdentifier: trimmedBundleIdentifier)
+            .first(where: { !$0.isTerminated }) ??
+        NSWorkspace.shared.runningApplications.first(where: {
+            guard let candidate = $0.bundleIdentifier else { return false }
+            return candidate.caseInsensitiveCompare(trimmedBundleIdentifier) == .orderedSame && !$0.isTerminated
+        })
+
+    guard let runningApp else {
         let failureMessage =
-            "PN/AppEl: Could not find running application with bundle identifier '\(bundleIdentifier)'."
+            "PN/AppEl: Could not find running application with bundle identifier '\(trimmedBundleIdentifier)'."
         logPathNavigation(.warning, failureMessage)
         return nil
     }
