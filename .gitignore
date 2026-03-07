@@ -48,6 +48,7 @@ playground.xcworkspace
 
 .build/
 dist/
+npm/*.tgz
 
 # CocoaPods
 #

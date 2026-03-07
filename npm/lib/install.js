@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const https = require("node:https");
+const readline = require("node:readline/promises");
 const { pipeline } = require("node:stream/promises");
 const { createWriteStream } = require("node:fs");
 const { spawnSync } = require("node:child_process");
@@ -87,12 +88,72 @@ function installBinary(extractedRoot, vendorDir) {
   fs.mkdirSync(vendorDir, { recursive: true });
   fs.copyFileSync(sourceBinary, targetBinary);
   fs.chmodSync(targetBinary, 0o755);
+  return targetBinary;
+}
+
+function shouldPromptForSkills() {
+  if (process.env.CI) {
+    return false;
+  }
+
+  if (process.env.OSX_QUERY_SKIP_SKILLS_PROMPT === "1") {
+    return false;
+  }
+
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
+}
+
+async function maybePromptForSkills() {
+  if (!shouldPromptForSkills()) {
+    console.log(
+      "Optional: run `npx skills add Moulik-Budhiraja/OSX-Query` to install the Codex skill."
+    );
+    return;
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  try {
+    const answer = await rl.question(
+      "Install the optional Codex skill now? This will run `npx skills add Moulik-Budhiraja/OSX-Query` [y/N]: "
+    );
+
+    if (!/^(y|yes)$/i.test(answer.trim())) {
+      console.log(
+        "Skipped skill install. You can run `npx skills add Moulik-Budhiraja/OSX-Query` later."
+      );
+      return;
+    }
+  } finally {
+    rl.close();
+  }
+
+  const command = process.platform === "win32" ? "npx.cmd" : "npx";
+  const result = spawnSync(command, ["skills", "add", "Moulik-Budhiraja/OSX-Query"], {
+    stdio: "inherit",
+  });
+
+  if (result.error) {
+    console.warn(
+      "Skill installer could not be launched. Run `npx skills add Moulik-Budhiraja/OSX-Query` manually."
+    );
+    return;
+  }
+
+  if (result.status !== 0) {
+    console.warn(
+      "Skill install did not complete successfully. Run `npx skills add Moulik-Budhiraja/OSX-Query` manually."
+    );
+  }
 }
 
 async function main() {
-  const version = pkg.version;
-  const assetName = getAssetName(version);
-  const url = `https://github.com/Moulik-Budhiraja/OSX-Query/releases/download/v${version}/${assetName}`;
+  const binaryVersion = pkg.osxBinaryVersion || pkg.version;
+  const assetName = getAssetName(binaryVersion);
+  const url = `https://github.com/Moulik-Budhiraja/OSX-Query/releases/download/v${binaryVersion}/${assetName}`;
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "osx-query-"));
   const zipPath = path.join(tempDir, assetName);
   const extractDir = path.join(tempDir, "extract");
@@ -106,7 +167,10 @@ async function main() {
     fs.mkdirSync(extractDir, { recursive: true });
 
     extract(zipPath, extractDir);
-    installBinary(extractDir, vendorDir);
+    const installedBinary = installBinary(extractDir, vendorDir);
+    console.log(`Installed osx at ${installedBinary}`);
+    console.log("Run `osx --help` to get started.");
+    await maybePromptForSkills();
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
