@@ -1,6 +1,6 @@
 {
   "name": "osx-query",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "osxBinaryVersion": "0.1.2",
   "description": "macOS Accessibility query CLI",
   "license": "MIT",

@@ -56,16 +56,16 @@ If queries return nothing useful, grant Accessibility access to your terminal ap
 
 ## Optional Codex Skill
 
-After install, the package can optionally prompt to run:
+On first run, `osx` can optionally prompt to run:
 
 ```bash
 npx skills add Moulik-Budhiraja/OSX-Query
 ```
 
-That step is optional and only appears in an interactive terminal. If you skip it during install, you can run it later yourself.
+That step is optional and only appears once in an interactive terminal. If you skip it, you can still run it later yourself.
 
 To suppress the prompt entirely:
 
 ```bash
-OSX_QUERY_SKIP_SKILLS_PROMPT=1 npm i -g osx-query
+OSX_QUERY_SKIP_SKILLS_PROMPT=1 osx --help
 ```

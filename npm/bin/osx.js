@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const https = require("node:https");
+const readline = require("node:readline/promises");
 const { spawnSync } = require("node:child_process");
 
 const pkg = require("../package.json");
@@ -51,6 +52,18 @@ function readCache(cacheFile) {
 function writeCache(cacheFile, payload) {
   fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
   fs.writeFileSync(cacheFile, `${JSON.stringify(payload)}\n`);
+}
+
+function shouldPromptForSkills() {
+  if (process.env.CI) {
+    return false;
+  }
+
+  if (process.env.OSX_QUERY_SKIP_SKILLS_PROMPT === "1") {
+    return false;
+  }
+
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
 }
 
 function fetchLatestVersion() {
@@ -137,6 +150,60 @@ async function maybeWarnAboutUpdate() {
   }
 }
 
+async function maybePromptForSkills() {
+  if (!shouldPromptForSkills()) {
+    return;
+  }
+
+  const cacheFile = getCacheFilePath();
+  const cached = readCache(cacheFile) || {};
+  if (cached.skillsPromptedAt) {
+    return;
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  let answer = "";
+  try {
+    answer = await rl.question(
+      "Install the optional Codex skill now? This will run `npx skills add Moulik-Budhiraja/OSX-Query` [y/N]: "
+    );
+  } finally {
+    rl.close();
+  }
+
+  const nextCache = {
+    ...cached,
+    skillsPromptedAt: Date.now(),
+  };
+  writeCache(cacheFile, nextCache);
+
+  if (!/^(y|yes)$/i.test(answer.trim())) {
+    return;
+  }
+
+  const command = process.platform === "win32" ? "npx.cmd" : "npx";
+  const result = spawnSync(command, ["skills", "add", "Moulik-Budhiraja/OSX-Query"], {
+    stdio: "inherit",
+  });
+
+  if (result.error) {
+    console.warn(
+      "Skill installer could not be launched. Run `npx skills add Moulik-Budhiraja/OSX-Query` manually."
+    );
+    return;
+  }
+
+  if (result.status !== 0) {
+    console.warn(
+      "Skill install did not complete successfully. Run `npx skills add Moulik-Budhiraja/OSX-Query` manually."
+    );
+  }
+}
+
 if (!fs.existsSync(binaryPath)) {
   console.error("osx-query is not installed correctly: native binary is missing");
   console.error("Try reinstalling: npm i -g osx-query");
@@ -145,6 +212,7 @@ if (!fs.existsSync(binaryPath)) {
 
 async function main() {
   await maybeWarnAboutUpdate();
+  await maybePromptForSkills();
 
   const result = spawnSync(binaryPath, process.argv.slice(2), {
     stdio: "inherit",
