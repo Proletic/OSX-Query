@@ -2,8 +2,6 @@
 
 import Foundation
 
-let osxVersion = "0.1.3"
-
 /// Returns a human-readable build stamp (yyMMddHHmm) evaluated at runtime.
 /// Good enough for confirming we're on the binary we just built.
 var osxBuildStamp: String {

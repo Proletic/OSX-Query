@@ -7,6 +7,7 @@ This project ships a native macOS CLI binary. The release flow is:
 3. package each signed binary as a `.zip`
 4. notarize each archive with `notarytool`
 5. attach release assets to a GitHub release
+6. publish the npm wrapper package
 
 ## Local Prerequisites
 
@@ -69,3 +70,24 @@ The release workflow expects these secrets:
 - The notarized artifact here is a `.zip`, which is suitable for binary distribution and later npm-based download flows.
 - For direct installer distribution, add a signed `.pkg` or `.dmg` later.
 
+## npm Publishing
+
+The npm wrapper package lives in `npm/` and installs the native CLI from GitHub Releases.
+
+Publish flow:
+
+1. confirm the GitHub release exists for the same version
+2. sync the source and npm version metadata
+3. publish from `npm/`
+
+```bash
+./scripts/set-version.sh v0.1.2
+cd npm
+npm publish --access public
+```
+
+Users then install with:
+
+```bash
+npm i -g osx-query
+```

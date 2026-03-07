@@ -1,0 +1,118 @@
+"use strict";
+
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const https = require("node:https");
+const { pipeline } = require("node:stream/promises");
+const { createWriteStream } = require("node:fs");
+const { spawnSync } = require("node:child_process");
+
+const pkg = require("../package.json");
+const { getAssetName } = require("./platform");
+
+async function download(url, destination) {
+  await new Promise((resolve, reject) => {
+    const request = https.get(
+      url,
+      {
+        headers: {
+          "User-Agent": "osx-query-installer",
+        },
+      },
+      async (response) => {
+        if (
+          response.statusCode &&
+          response.statusCode >= 300 &&
+          response.statusCode < 400 &&
+          response.headers.location
+        ) {
+          response.resume();
+          try {
+            await download(response.headers.location, destination);
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+          return;
+        }
+
+        if (response.statusCode !== 200) {
+          reject(
+            new Error(
+              `Failed to download ${url} (status ${response.statusCode || "unknown"})`
+            )
+          );
+          return;
+        }
+
+        try {
+          await pipeline(response, createWriteStream(destination));
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      }
+    );
+
+    request.on("error", reject);
+  });
+}
+
+function extract(zipPath, outputDir) {
+  const result = spawnSync("ditto", ["-x", "-k", zipPath, outputDir], {
+    stdio: "inherit",
+  });
+
+  if (result.status !== 0) {
+    throw new Error("Failed to extract release archive");
+  }
+}
+
+function installBinary(extractedRoot, vendorDir) {
+  const entries = fs.readdirSync(extractedRoot, { withFileTypes: true });
+  const packageDir = entries.find((entry) => entry.isDirectory());
+
+  if (!packageDir) {
+    throw new Error("Release archive did not contain the expected directory");
+  }
+
+  const sourceBinary = path.join(extractedRoot, packageDir.name, "osx");
+  const targetBinary = path.join(vendorDir, "osx");
+
+  if (!fs.existsSync(sourceBinary)) {
+    throw new Error("Release archive did not contain the osx binary");
+  }
+
+  fs.mkdirSync(vendorDir, { recursive: true });
+  fs.copyFileSync(sourceBinary, targetBinary);
+  fs.chmodSync(targetBinary, 0o755);
+}
+
+async function main() {
+  const version = pkg.version;
+  const assetName = getAssetName(version);
+  const url = `https://github.com/Moulik-Budhiraja/OSX-Query/releases/download/v${version}/${assetName}`;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "osx-query-"));
+  const zipPath = path.join(tempDir, assetName);
+  const extractDir = path.join(tempDir, "extract");
+  const vendorDir = path.join(__dirname, "vendor");
+
+  try {
+    console.log(`Downloading ${assetName}`);
+    await download(url, zipPath);
+
+    fs.rmSync(vendorDir, { recursive: true, force: true });
+    fs.mkdirSync(extractDir, { recursive: true });
+
+    extract(zipPath, extractDir);
+    installBinary(extractDir, vendorDir);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+main().catch((error) => {
+  console.error(error.message);
+  process.exit(1);
+});

@@ -1,0 +1,35 @@
+{
+  "name": "osx-query",
+  "version": "0.1.2",
+  "description": "macOS Accessibility query CLI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Moulik-Budhiraja/OSX-Query.git"
+  },
+  "homepage": "https://github.com/Moulik-Budhiraja/OSX-Query#readme",
+  "bugs": {
+    "url": "https://github.com/Moulik-Budhiraja/OSX-Query/issues"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64",
+    "x64"
+  ],
+  "preferGlobal": true,
+  "bin": {
+    "osx": "bin/osx.js"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "scripts": {
+    "postinstall": "node ./lib/install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

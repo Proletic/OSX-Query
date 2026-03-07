@@ -20,6 +20,8 @@ mkdir -p "$DIST_DIR"
 rm -rf "$DIST_DIR/$VERSION"
 mkdir -p "$DIST_DIR/$VERSION"
 
+"$ROOT_DIR/scripts/set-version.sh" "$VERSION"
+
 build_arch() {
   local arch="$1"
   local release_dir="$ROOT_DIR/.build/${arch}-apple-macosx/release"
@@ -52,4 +54,3 @@ if [[ "${NOTARIZE:-0}" == "1" ]]; then
 fi
 
 echo "Release artifacts available in $DIST_DIR/$VERSION"
-

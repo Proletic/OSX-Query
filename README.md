@@ -76,6 +76,16 @@ make release-macos-notarized VERSION=v0.1.0
 
 See [docs/releasing.md](docs/releasing.md) for the full release setup, including GitHub Actions secrets.
 
+## npm Install
+
+After a release is published to npm, users can install the CLI with:
+
+```bash
+npm i -g osx-query
+```
+
+The npm package downloads the signed and notarized native binary for the current macOS architecture from GitHub Releases.
+
 ## Build And Run
 
 ```bash
