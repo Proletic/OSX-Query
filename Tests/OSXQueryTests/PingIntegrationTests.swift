@@ -37,16 +37,16 @@ struct PingIntegrationTests {
         let result = try runOSXCommand(arguments: [payload])
         #expect(result.exitCode != 0)
         #expect(result.output?.isEmpty ?? true)
-        #expect(result.errorOutput?.contains("error: No CLI mode selected") == true)
+        #expect(result.errorOutput?.contains("error: Unknown subcommand") == true)
         #expect(result.errorOutput?.contains("osx --help") == true)
     }
 
-    @Test("Rejects empty invocation without selector or AX exposure mode", .tags(.safe))
+    @Test("Rejects empty invocation without a subcommand", .tags(.safe))
     func rejectsNoModeInvocation() throws {
         let result = try runOSXCommand(arguments: [])
         #expect(result.exitCode != 0)
         #expect(result.output?.isEmpty ?? true)
-        #expect(result.errorOutput?.contains("error: No CLI mode selected") == true)
+        #expect(result.errorOutput?.contains("error: Command 'osx' requires a subcommand") == true)
         #expect(result.errorOutput?.contains("osx --help") == true)
     }
 
@@ -56,8 +56,8 @@ struct PingIntegrationTests {
         #expect(result.exitCode == 0)
         #expect(result.errorOutput?.isEmpty ?? true)
         #expect(result.output?.contains("USAGE") == true)
-        #expect(result.output?.contains("OPTIONS") == true)
-        #expect(result.output?.contains("--selector") == true)
+        #expect(result.output?.contains("COMMANDS") == true)
+        #expect(result.output?.contains("query") == true)
     }
 
     @Test("Prints help with help command", .tags(.safe))
@@ -66,6 +66,6 @@ struct PingIntegrationTests {
         #expect(result.exitCode == 0)
         #expect(result.errorOutput?.isEmpty ?? true)
         #expect(result.output?.contains("USAGE") == true)
-        #expect(result.output?.contains("--enable-ax") == true)
+        #expect(result.output?.contains("enable-ax") == true)
     }
 }

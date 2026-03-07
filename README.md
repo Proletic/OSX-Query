@@ -65,7 +65,7 @@ swift build
 swift run osx --help
 
 # Query example
-swift run osx --app focused --selector "AXWindow AXButton" --limit 20
+swift run osx query --app focused "AXWindow AXButton" --limit 20
 ```
 
 ## Accessibility Permissions
@@ -80,31 +80,35 @@ The library includes helpers (`AXPermissionHelpers`) to:
 
 ## CLI Overview
 
-Primary modes:
+Primary commands:
 
-1. Selector query mode
-
-```bash
-osx --app <target> --selector "<query>" [options]
-```
-
-2. Interactive selector mode
+1. Query
 
 ```bash
-osx --app <target> --selector -i
-# or
-osx --app <target> -i
+osx query --app <target> "<query>" [options]
 ```
 
-3. AX exposure mode
+2. Interactive
 
 ```bash
-osx --enable-ax <bundle-id>
+osx interactive <app> [options]
 ```
 
-### App Target Resolution (`--app`)
+3. Action
 
-Selector mode accepts:
+```bash
+osx action '<program>'
+```
+
+4. AX exposure
+
+```bash
+osx enable-ax <bundle-id>
+```
+
+### App Target Resolution
+
+`query --app` and `interactive <app>` accept:
 
 - bundle id (`com.apple.TextEdit`)
 - exact running app name (case-insensitive match)
@@ -113,9 +117,9 @@ Selector mode accepts:
 
 ### Option Reference (Public CLI)
 
-- `--app <target>`: target app for selector mode (bundle id, app name, PID, or `focused`).
-- `--selector <query>`: OXQ selector query.
-- `--actions <program>`: execute an OXA action program against cached refs.
+- `query --app <target> <query>`: run a selector query.
+- `interactive <app>`: open the full-screen TUI query workflow.
+- `action <program>`: execute an OXA action program against cached refs.
 - `--max-depth <n>`: maximum selector traversal depth. Default is unlimited.
 - `--limit <n>`: max rows to print. Default `50`; `0` means no cap.
 - `--show-path`: include generated path for each shown match.
@@ -123,8 +127,7 @@ Selector mode accepts:
 - `--no-color`: disable ANSI role/status colors.
 - `--cache-session`: query through cache daemon and refresh warm snapshot.
 - `--use-cached`: query through cache daemon using existing warm snapshot only.
-- `-i`, `--interactive`: full-screen TUI selector workflow.
-- `--enable-ax <bundle-id>`: run AX exposure flow.
+- `enable-ax <bundle-id>`: run AX exposure flow.
 - `--debug`, `--verbose`: enable normal/verbose diagnostic logging.
 - `-h`, `--help` or `help`: print CLI usage.
 
@@ -138,13 +141,13 @@ Quick examples:
 
 ```bash
 # All buttons under any window
-osx --app TextEdit --selector "AXWindow AXButton"
+osx query --app TextEdit "AXWindow AXButton"
 
 # Parent that has a direct child text field
-osx --app TextEdit --selector "AXGroup:has(> AXTextField)"
+osx query --app TextEdit "AXGroup:has(> AXTextField)"
 
 # Disjunction
-osx --app TextEdit --selector "AXTextArea, AXTextField, AXComboBox"
+osx query --app TextEdit "AXTextArea, AXTextField, AXComboBox"
 ```
 
 Selector mode output format:

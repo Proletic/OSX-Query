@@ -3,7 +3,7 @@
 ## Selector Query Mode
 
 ```bash
-osx --app <target> --selector "<query>" [options]
+osx query --app <target> "<query>" [options]
 ```
 
 Common options:
@@ -21,15 +21,13 @@ Common options:
 Example:
 
 ```bash
-osx --app TextEdit --selector "AXWindow AXButton" --limit 20 --show-path
+osx query --app TextEdit "AXWindow AXButton" --limit 20 --show-path
 ```
 
 ## Interactive Selector Mode
 
 ```bash
-osx --app <target> -i
-# or
-osx --app <target> --selector -i
+osx interactive <app> [options]
 ```
 
 Interactive mode opens a full-screen TUI for editing selectors, running queries, navigating results, and triggering inline actions.
@@ -40,21 +38,20 @@ Run OXA actions against cached references from a previous cache-daemon query.
 
 ```bash
 # 1) Build/refresh snapshot and refs
-osx --app TextEdit --selector "AXButton" --cache-session
+osx query --app TextEdit "AXButton" --cache-session
 
 # 2) Execute OXA program against ref ids from query output (ref=...)
-osx --actions 'send click to 28e6a93cf;'
+osx action 'send click to 28e6a93cf;'
 ```
 
 Notes:
 
-- Action mode cannot be combined with selector flags or `--enable-ax`.
 - If no warm snapshot exists, action mode fails with a cache-daemon error.
 
 ## AX Exposure Mode
 
 ```bash
-osx --enable-ax com.apple.TextEdit
+osx enable-ax com.apple.TextEdit
 ```
 
 This temporarily focuses the app, applies `AXEnhancedUserInterface=true` and `AXManualAccessibility=true`, then restores previous focus.
@@ -64,6 +61,6 @@ This temporarily focuses the app, applies `AXEnhancedUserInterface=true` and `AX
 ```bash
 osx --help
 osx help
-osx --app focused --selector "AXWindow" --debug
-osx --app focused --selector "AXWindow" --verbose
+osx query --app focused "AXWindow" --debug
+osx query --app focused "AXWindow" --verbose
 ```

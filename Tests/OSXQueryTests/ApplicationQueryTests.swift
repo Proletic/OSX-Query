@@ -37,11 +37,12 @@ struct ApplicationQueryTests {
     @Test("Collect all running applications", .tags(.safe))
     func getAllApplications() async throws {
         let result = try runOSXCommand(arguments: [
+            "query",
             "--app", "focused",
-            "--selector", "AXApplication",
             "--max-depth", "1",
             "--limit", "5",
             "--no-color",
+            "AXApplication",
         ])
         #expect(result.exitCode == 0, "Command should succeed")
         #expect(result.output?.contains("stats app=focused") == true, "Should include selector stats header")
@@ -67,10 +68,11 @@ struct ApplicationQueryTests {
         try await Task.sleep(for: .seconds(1))
 
         let result = try runOSXCommand(arguments: [
+            "query",
             "--app", "TextEdit",
-            "--selector", "AXWindow",
             "--limit", "10",
             "--no-color",
+            "AXWindow",
         ])
         #expect(result.exitCode == 0)
         #expect(result.output?.contains("AXWindow") == true, "Output should include AXWindow entries")
@@ -103,10 +105,11 @@ struct ApplicationQueryTests {
         #expect(preQueryFrontmostPid != textEditPid, "Expected another app to be frontmost before query.")
 
         let result = try runOSXCommand(arguments: [
+            "query",
             "--app", "com.apple.TextEdit",
-            "--selector", "AXTextArea",
             "--limit", "1",
             "--no-color",
+            "AXTextArea",
         ])
 
         #expect(result.exitCode == 0, "Query command should succeed.")
@@ -119,8 +122,9 @@ struct ApplicationQueryTests {
     @Test("Query non-existent application", .tags(.safe))
     func queryNonExistentApp() async throws {
         let result = try runOSXCommand(arguments: [
+            "query",
             "--app", "NonExistentApp12345",
-            "--selector", "*",
+            "*",
         ])
 
         #expect(result.exitCode != 0, "Command should fail when target app is not running")

@@ -1,30 +1,30 @@
 # Selector Syntax
 
-This document contains the full `--selector` syntax reference for `osx`.
+This document contains the full selector syntax reference for `osx query`.
 
 ## Quick Examples
 
 ```bash
 # All buttons under any window
-osx --app TextEdit --selector "AXWindow AXButton"
+osx query --app TextEdit "AXWindow AXButton"
 
 # Direct child text field
-osx --app TextEdit --selector "AXGroup > AXTextField"
+osx query --app TextEdit "AXGroup > AXTextField"
 
 # Attribute contains
-osx --app TextEdit --selector "AXButton[AXTitle*=\"Save\"]"
+osx query --app TextEdit "AXButton[AXTitle*=\"Save\"]"
 
 # Match by computed name alias (CPName)
-osx --app TextEdit --selector "*[CPName*=\"Save\"]"
+osx query --app TextEdit "*[CPName*=\"Save\"]"
 
 # Parent that has a direct child text field
-osx --app TextEdit --selector "AXGroup:has(> AXTextField)"
+osx query --app TextEdit "AXGroup:has(> AXTextField)"
 
 # Exclude matches
-osx --app TextEdit --selector "AXTextArea:not([AXValue*=\"draft\"])"
+osx query --app TextEdit "AXTextArea:not([AXValue*=\"draft\"])"
 
 # Disjunction
-osx --app TextEdit --selector "AXTextArea, AXTextField, AXComboBox"
+osx query --app TextEdit "AXTextArea, AXTextField, AXComboBox"
 ```
 
 ## Grammar (Practical)

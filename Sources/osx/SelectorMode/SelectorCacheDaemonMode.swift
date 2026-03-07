@@ -221,8 +221,8 @@ struct SelectorCacheDaemonClient {
         let process = Process()
         process.executableURL = try self.currentExecutableURL()
         process.arguments = [
-            "--selector-cache-daemon",
-            "--selector-cache-daemon-socket",
+            "selector-cache-daemon",
+            "--socket",
             socketPath,
         ]
         process.standardOutput = FileHandle.nullDevice

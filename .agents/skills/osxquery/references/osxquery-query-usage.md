@@ -2,8 +2,8 @@
 
 This guide is for readers with no prior chat context.
 It documents both APIs:
-- OXQ query API (`--app ... --selector ...`)
-- OXA actions API (`--actions '...'`)
+- OXQ query API (`query --app ... '...'`)
+- OXA actions API (`action '...'`)
 
 This file also captures practical defaults that worked repeatedly in live usage.
 
@@ -50,13 +50,13 @@ Matching reminders:
 
 Core shape:
 ```bash
-osx --app <target> --selector "<query>" [options]
+osx query --app <target> "<query>" [options]
 ```
 
 Actions-first quick shape:
 ```bash
-osx --app <target> --selector "<query>" [--cache-session|--use-cached] [--limit N]
-osx --actions '<statement>; <statement>; ...'
+osx query --app <target> "<query>" [--cache-session|--use-cached] [--limit N]
+osx action '<statement>; <statement>; ...'
 ```
 
 Most useful query options:
@@ -78,28 +78,28 @@ Targeting tips:
 
 Pattern 0: broad discovery pass
 ```bash
-osx --app <target> --selector 'AXTextField,AXTextArea,AXComboBox' --limit 80
-osx --app <target> --selector '*[CPName*="<keyword>"]' --limit 80
+osx query --app <target> 'AXTextField,AXTextArea,AXComboBox' --limit 80
+osx query --app <target> '*[CPName*="<keyword>"]' --limit 80
 ```
 
 Pattern A: refine then verify
 ```bash
-osx --app net.imput.helium \
-  --selector '*[CPName="In the news"]:not(AXStaticText)' \
+osx query --app net.imput.helium \
+  '*[CPName="In the news"]:not(AXStaticText)' \
   --limit 20 --show-path
 ```
 
 Pattern B: contextual targeting with `:has(...)`
 ```bash
-osx --app net.imput.helium \
-  --selector 'AXGroup:has(AXHeading[CPName="In the news"]) AXLink' \
+osx query --app net.imput.helium \
+  'AXGroup:has(AXHeading[CPName="In the news"]) AXLink' \
   --limit 120
 ```
 
 Pattern C: exclusion hygiene with `:not(...)`
 ```bash
-osx --app net.imput.helium \
-  --selector 'AXLink[CPName*="Diddy Blud"]:not([CPName*="Go to channel"])'
+osx query --app net.imput.helium \
+  'AXLink[CPName*="Diddy Blud"]:not([CPName*="Go to channel"])'
 ```
 
 Pattern D: role-first, text-second

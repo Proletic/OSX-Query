@@ -2,8 +2,8 @@
 
 This guide is for readers with no prior chat context.
 It documents both APIs:
-- OXQ query API (`--app ... --selector ...`)
-- OXA actions API (`--actions '...'`)
+- OXQ query API (`query --app ... '...'`)
+- OXA actions API (`action '...'`)
 
 This file also captures practical defaults that worked repeatedly in live usage.
 
@@ -25,19 +25,19 @@ This file also captures practical defaults that worked repeatedly in live usage.
 Example:
 ```bash
 # Warm refs on current UI
-osx --app net.imput.helium --selector 'AXTextField,AXWebArea' --cache-session
+osx query --app net.imput.helium 'AXTextField,AXWebArea' --cache-session
 
 # Act
-osx --actions 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
+osx action 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
 
 # UI changed => refresh refs
-osx --app net.imput.helium --selector 'AXWebArea,AXLink' --cache-session --limit 80
+osx query --app net.imput.helium 'AXWebArea,AXLink' --cache-session --limit 80
 
 # No action in between => use cached for fast refinement
-osx --app net.imput.helium --selector 'AXLink[CPName*="In the news"]' --use-cached
+osx query --app net.imput.helium 'AXLink[CPName*="In the news"]' --use-cached
 ```
 
-## 3. `--actions` grammar reference
+## 3. `action` grammar reference
 
 An actions program is a semicolon-terminated statement list.
 
@@ -175,7 +175,7 @@ Validated behavior:
 
 Example:
 ```bash
-osx --actions "send text \"He stated deep concern for 'a significant number of children and civilians' ...\" as keys to 0637027b0;"
+osx action "send text \"He stated deep concern for 'a significant number of children and civilians' ...\" as keys to 0637027b0;"
 ```
 
 ## 10. Failure modes and fixes
@@ -195,21 +195,21 @@ osx --actions "send text \"He stated deep concern for 'a significant number of c
 ## 11. End-to-end starter template
 ```bash
 # 1) Warm refs from current UI
-osx --app net.imput.helium \
-  --selector 'AXTextField[AXDescription*="Address and search bar"],AXWebArea' \
+osx query --app net.imput.helium \
+  'AXTextField[AXDescription*="Address and search bar"],AXWebArea' \
   --cache-session --limit 20
 
 # 2) Navigate
-osx --actions 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
+osx action 'send text "https://en.wikipedia.org/wiki/Main_Page" to 063701191; send hotkey enter to 063701191;'
 
 # 3) Re-query after UI change
-osx --app net.imput.helium \
-  --selector 'AXHeading[CPName="In the news"],AXLink' \
+osx query --app net.imput.helium \
+  'AXHeading[CPName="In the news"],AXLink' \
   --cache-session --limit 200
 
 # 4) Click target link
-osx --actions 'send click to 072701121;'
+osx action 'send click to 072701121;'
 
 # 5) Continue with query/action loop
-osx --app net.imput.helium --selector 'AXWebArea,AXHeading' --cache-session --limit 60
+osx query --app net.imput.helium 'AXWebArea,AXHeading' --cache-session --limit 60
 ```
