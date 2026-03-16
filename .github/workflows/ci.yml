@@ -36,6 +36,10 @@ on:
         description: 'Swift test filter to run on the Tart runner'
         required: false
         default: "getAllApplications"
+      enable_coverage:
+        description: 'Run tests with Swift code coverage enabled and print an llvm-cov report'
+        required: false
+        default: "false"
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
@@ -146,4 +150,21 @@ jobs:
       run: |
         set -euxo pipefail
         TEST_FILTER="${{ github.event.inputs.test_filter }}"
-        swift test --filter "$TEST_FILTER"
+        ENABLE_COVERAGE="${{ github.event.inputs.enable_coverage }}"
+
+        TEST_ARGS=()
+        if [ "$ENABLE_COVERAGE" = "true" ]; then
+          TEST_ARGS+=(--enable-code-coverage)
+        fi
+        if [ -n "$TEST_FILTER" ]; then
+          TEST_ARGS+=(--filter "$TEST_FILTER")
+        fi
+
+        swift test "${TEST_ARGS[@]}"
+
+        if [ "$ENABLE_COVERAGE" = "true" ]; then
+          TEST_BINARY="$(find .build -path '*OSXQueryPackageTests.xctest/Contents/MacOS/OSXQueryPackageTests' | head -n 1)"
+          xcrun llvm-cov report "$TEST_BINARY" \
+            -instr-profile .build/arm64-apple-macosx/debug/codecov/default.profdata \
+            Sources/OSXQuery Sources/osx
+        fi
