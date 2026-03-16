@@ -101,3 +101,53 @@ jobs:
       run: |
         echo "⚠️  Tests require accessibility permissions and cannot run on CI"
         echo "📝 Run 'make test' locally after granting accessibility permissions"
+
+  accessibility-smoke:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, macos-ephemeral]
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Fetch Commander dependency
+      shell: bash
+      run: git clone --depth 1 https://github.com/steipete/Commander.git ../Commander
+
+    - name: Select Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: ${{ env.XCODE_VERSION }}
+
+    - name: Install Swift toolchain
+      uses: SwiftyLab/setup-swift@v1
+      with:
+        swift-version: ${{ env.SWIFT_VERSION }}
+
+    - name: Build osx CLI
+      shell: bash
+      run: |
+        set -euxo pipefail
+        swift build --product osx
+        echo "OSX_BIN=$(swift build --show-bin-path)/osx" >> "$GITHUB_ENV"
+
+    - name: Grant accessibility to built CLI
+      shell: bash
+      run: |
+        set -euxo pipefail
+        gha-tcc apply --path "$OSX_BIN" accessibility
+        gha-tcc status --path "$OSX_BIN" accessibility
+
+    - name: Probe accessibility with osx CLI
+      shell: bash
+      run: |
+        set -euxo pipefail
+        "$OSX_BIN" query --app focused --max-depth 1 --limit 5 --no-color AXApplication | tee /tmp/osx-smoke-output.txt
+        grep -q "AXApplication" /tmp/osx-smoke-output.txt
+
+    - name: Run single end-to-end smoke test
+      shell: bash
+      run: |
+        set -euxo pipefail
+        swift test --filter getAllApplications
