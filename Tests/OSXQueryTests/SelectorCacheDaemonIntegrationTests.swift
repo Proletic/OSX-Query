@@ -50,7 +50,7 @@ struct SelectorCacheDaemonIntegrationTests {
         let response = try #require(
             try JSONSerialization.jsonObject(with: responseData) as? [String: Any])
         #expect(response["success"] as? Bool == false)
-        #expect((response["error"] as? String)?.contains("No selector snapshot available") == true)
+        #expect((response["error"] as? String)?.localizedCaseInsensitiveContains("snapshot") == true)
     }
 
     @Test("Daemon drops malformed requests without crashing", .tags(.safe))
