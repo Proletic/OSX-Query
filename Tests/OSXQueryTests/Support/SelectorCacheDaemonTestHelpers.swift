@@ -7,9 +7,7 @@ struct DaemonProcessHandle {
 }
 
 func makeTemporarySelectorCacheSocketPath() -> String {
-    FileManager.default.temporaryDirectory
-        .appendingPathComponent("osx-selector-cache-\(UUID().uuidString).sock")
-        .path
+    "/tmp/osx-selector-cache-\(UUID().uuidString.prefix(12)).sock"
 }
 
 func launchSelectorCacheDaemon(socketPath: String) throws -> DaemonProcessHandle {
