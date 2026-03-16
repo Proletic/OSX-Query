@@ -32,6 +32,10 @@ on:
         description: 'Reason for triggering the workflow run'
         required: false
         default: "Manual trigger"
+      test_filter:
+        description: 'Swift test filter to run on the Tart runner'
+        required: false
+        default: "getAllApplications"
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
@@ -46,6 +50,7 @@ permissions:
 
 jobs:
   build-and-lint:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: [self-hosted, macos-ephemeral]
     timeout-minutes: 20
     
@@ -140,4 +145,5 @@ jobs:
       shell: bash
       run: |
         set -euxo pipefail
-        swift test --filter getAllApplications
+        TEST_FILTER="${{ github.event.inputs.test_filter }}"
+        swift test --filter "$TEST_FILTER"
