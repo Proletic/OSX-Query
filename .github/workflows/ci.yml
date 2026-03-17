@@ -54,7 +54,6 @@ permissions:
 
 jobs:
   build-and-lint:
-    if: github.event_name != 'workflow_dispatch'
     runs-on: [self-hosted, macos-ephemeral]
     timeout-minutes: 20
     
@@ -78,8 +77,11 @@ jobs:
         brew install swiftlint swiftformat
     
     - name: Build
+      shell: bash
       run: |
-        swift build
+        set -euxo pipefail
+        swift build --product osx --product AXFixtureApp
+        echo "OSX_BIN=$(swift build --show-bin-path)/osx" >> "$GITHUB_ENV"
     
     - name: Run SwiftFormat (check only)
       continue-on-error: true
@@ -99,38 +101,6 @@ jobs:
         fi
         echo "::endgroup::"
     
-    - name: Run Tests (would require accessibility permissions)
-      run: |
-        echo "⚠️  Tests require accessibility permissions and cannot run on CI"
-        echo "📝 Run 'make test' locally after granting accessibility permissions"
-
-  accessibility-smoke:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: [self-hosted, macos-ephemeral]
-    timeout-minutes: 20
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Fetch Commander dependency
-      shell: bash
-      run: git clone --depth 1 https://github.com/steipete/Commander.git ../Commander
-
-    - name: Show runner toolchain
-      shell: bash
-      run: |
-        set -euxo pipefail
-        xcodebuild -version
-        swift --version
-
-    - name: Build osx CLI
-      shell: bash
-      run: |
-        set -euxo pipefail
-        swift build --product osx
-        echo "OSX_BIN=$(swift build --show-bin-path)/osx" >> "$GITHUB_ENV"
-
     - name: Grant accessibility to built CLI
       shell: bash
       run: |
@@ -145,12 +115,14 @@ jobs:
         "$OSX_BIN" query --app focused --max-depth 1 --limit 5 --no-color AXApplication | tee /tmp/osx-smoke-output.txt
         grep -q "AXApplication" /tmp/osx-smoke-output.txt
 
-    - name: Run single end-to-end smoke test
+    - name: Run Tests
       shell: bash
+      env:
+        RUN_AUTOMATION_TESTS: "true"
       run: |
         set -euxo pipefail
-        TEST_FILTER="${{ github.event.inputs.test_filter }}"
-        ENABLE_COVERAGE="${{ github.event.inputs.enable_coverage }}"
+        TEST_FILTER="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter || '' }}"
+        ENABLE_COVERAGE="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.enable_coverage || 'false' }}"
 
         TEST_ARGS=()
         if [ "$ENABLE_COVERAGE" = "true" ]; then

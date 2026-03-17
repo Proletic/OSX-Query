@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import AXFixtureShared
 import Testing
 @testable import OSXQuery
 
@@ -50,32 +51,26 @@ struct ApplicationQueryTests {
     }
 
     @Test(
-        "List TextEdit windows",
+        "List fixture app windows",
         .tags(.automation),
         .enabled(if: AXTestEnvironment.runAutomationScenarios))
     @MainActor
     func getWindowsOfApplication() async throws {
-        await closeTextEdit()
-        try await Task.sleep(for: .milliseconds(500))
-
-        _ = try await setupTextEditAndGetInfo()
+        let session = try await launchFixtureApp()
         defer {
-            if let app = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.TextEdit").first {
-                app.terminate()
-            }
+            Task { await terminateFixtureApp(session) }
         }
-
-        try await Task.sleep(for: .seconds(1))
 
         let result = try runOSXCommand(arguments: [
             "query",
-            "--app", "TextEdit",
+            "--app", session.appIdentifier,
             "--limit", "10",
             "--no-color",
             "AXWindow",
         ])
         #expect(result.exitCode == 0)
         #expect(result.output?.contains("AXWindow") == true, "Output should include AXWindow entries")
+        #expect(result.output?.contains(AXFixtureUI.windowTitle) == true, "Output should include the fixture window title")
     }
 
     @Test(
@@ -84,16 +79,14 @@ struct ApplicationQueryTests {
         .enabled(if: AXTestEnvironment.runAutomationScenarios))
     @MainActor
     func selectorQueryDoesNotActivateTargetApp() async throws {
-        await closeTextEdit()
-        try await Task.sleep(for: .milliseconds(500))
-
-        let (textEditPid, _) = try await setupTextEditAndGetInfo()
-        guard let textEditApp = NSRunningApplication(processIdentifier: textEditPid) else {
-            Issue.record("Could not resolve running TextEdit app for PID \(textEditPid).")
-            return
-        }
+        let session = try await launchFixtureApp()
         defer {
-            textEditApp.terminate()
+            Task { await terminateFixtureApp(session) }
+        }
+
+        guard session.runningApplication != nil else {
+            Issue.record("Could not resolve running fixture app for PID \(session.pid).")
+            return
         }
 
         if let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first {
@@ -102,14 +95,14 @@ struct ApplicationQueryTests {
         }
 
         let preQueryFrontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        #expect(preQueryFrontmostPid != textEditPid, "Expected another app to be frontmost before query.")
+        #expect(preQueryFrontmostPid != session.pid, "Expected another app to be frontmost before query.")
 
         let result = try runOSXCommand(arguments: [
             "query",
-            "--app", "com.apple.TextEdit",
+            "--app", session.appIdentifier,
             "--limit", "1",
             "--no-color",
-            "AXTextArea",
+            "AXTextField",
         ])
 
         #expect(result.exitCode == 0, "Query command should succeed.")

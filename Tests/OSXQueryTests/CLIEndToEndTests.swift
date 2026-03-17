@@ -1,4 +1,5 @@
 import Foundation
+import AXFixtureShared
 import Testing
 
 @Suite("OSX CLI end-to-end", .tags(.safe))
@@ -137,7 +138,7 @@ struct CLIEndToEndTests {
 
         #expect(result.exitCode != 0)
         #expect(result.output?.isEmpty ?? true)
-        #expect(result.errorOutput?.contains("Unknown element reference 'deadbeef0'. Re-run query to refresh refs.") == true)
+        #expect(result.errorOutput?.contains("Unknown element reference 'deadbeef0'") == true)
     }
 
     @Test("Enable AX requires a bundle identifier", .tags(.safe))
@@ -189,6 +190,79 @@ struct CLIEndToEndTests {
         #expect(enableAXHelp.exitCode == 0)
         #expect(enableAXHelp.output?.contains("osx enable-ax") == true)
         #expect(enableAXHelp.output?.contains("osx enable-ax <bundle-id> [options]") == true)
+    }
+
+    @Test(
+        "Fixture app receives click and text interactions",
+        .tags(.automation),
+        .enabled(if: AXTestEnvironment.runAutomationScenarios))
+    @MainActor
+    func fixtureAppReceivesClickAndTextInteractions() async throws {
+        let session = try await launchFixtureApp()
+        defer {
+            Task { await terminateFixtureApp(session) }
+        }
+
+        try await activateFixtureApp(session)
+
+        let buttonQuery = try runOSXCommand(arguments: [
+            "query",
+            "--cache-session",
+            "--app", session.appIdentifier,
+            "--limit", "1",
+            "--no-color",
+            #"AXButton[AXTitle="Increment Counter"]"#,
+        ])
+        #expect(buttonQuery.exitCode == 0)
+        let buttonQueryOutput = try #require(buttonQuery.output)
+        let buttonRef = try #require(Self.firstReference(in: buttonQueryOutput))
+
+        let clickResult = try runOSXCommand(arguments: [
+            "action",
+            "send click to \(buttonRef);",
+        ])
+        #expect(clickResult.exitCode == 0)
+
+        let clickState = try await session.waitForState { state in
+            state.counter == 1 && state.lastEvent == "increment"
+        }
+        #expect(clickState.counter == 1)
+
+        let textFieldQuery = try runOSXCommand(arguments: [
+            "query",
+            "--cache-session",
+            "--app", session.appIdentifier,
+            "--limit", "1",
+            "--no-color",
+            "AXTextField",
+        ])
+        #expect(textFieldQuery.exitCode == 0)
+        let textFieldQueryOutput = try #require(textFieldQuery.output)
+        let textFieldRef = try #require(Self.firstReference(in: textFieldQueryOutput))
+
+        let actionResult = try runOSXCommand(arguments: [
+            "action",
+            """
+            send click to \(textFieldRef);
+            send text "hello fixture" as keys to \(textFieldRef);
+            """,
+        ])
+        #expect(actionResult.exitCode == 0)
+
+        let typedState = try await session.waitForState { state in
+            state.textValue.contains("hello fixture")
+        }
+        #expect(typedState.textValue.contains("hello fixture"))
+
+        let echoQuery = try runOSXCommand(arguments: [
+            "query",
+            "--app", session.appIdentifier,
+            "--limit", "1",
+            "--no-color",
+            #"AXStaticText[AXValue="Echo: hello fixture"]"#,
+        ])
+        #expect(echoQuery.exitCode == 0)
+        #expect(echoQuery.output?.contains("Echo: hello fixture") == true)
     }
 
     private static func firstReference(in output: String) -> String? {

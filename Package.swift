@@ -17,13 +17,21 @@ let package = Package(
     ],
     products: [
         .library(name: "OSXQuery", targets: ["OSXQuery"]),
+        .library(name: "AXFixtureShared", targets: ["AXFixtureShared"]),
         .executable(name: "osx", targets: ["osx"]),
+        .executable(name: "AXFixtureApp", targets: ["AXFixtureApp"]),
     ],
     dependencies: [
         .package(url: "https://github.com/steipete/Commander.git", exact: "0.2.1"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.4"),
     ],
     targets: [
+        .target(
+            name: "AXFixtureShared",
+            dependencies: [],
+            path: "Sources/AXFixtureShared",
+            swiftSettings: approachableConcurrencySettings
+        ),
         .target(
             name: "OSXQuery",
             dependencies: [
@@ -43,10 +51,20 @@ let package = Package(
             path: "Sources/osx",
             swiftSettings: approachableConcurrencySettings
         ),
+        .executableTarget(
+            name: "AXFixtureApp",
+            dependencies: [
+                "AXFixtureShared",
+            ],
+            path: "Sources/AXFixtureApp",
+            swiftSettings: approachableConcurrencySettings
+        ),
         .testTarget(
             name: "OSXQueryTests",
             dependencies: [
                 "OSXQuery",
+                "AXFixtureShared",
+                "AXFixtureApp",
             ],
             path: "Tests/OSXQueryTests",
             swiftSettings: approachableConcurrencySettings
