@@ -81,7 +81,8 @@ jobs:
       run: |
         set -euxo pipefail
         swift build --product osx --product AXFixtureApp
-        echo "OSX_BIN=$(swift build --show-bin-path)/osx" >> "$GITHUB_ENV"
+        echo "OSX_BIN=$(find .build -path '*/debug/osx' -type f | head -n 1)" >> "$GITHUB_ENV"
+        echo "FIXTURE_BIN=$(find .build -path '*/debug/AXFixtureApp' -type f | head -n 1)" >> "$GITHUB_ENV"
     
     - name: Run SwiftFormat (check only)
       continue-on-error: true
@@ -112,8 +113,24 @@ jobs:
       shell: bash
       run: |
         set -euxo pipefail
-        "$OSX_BIN" query --app focused --max-depth 1 --limit 5 --no-color AXApplication | tee /tmp/osx-smoke-output.txt
-        grep -q "AXApplication" /tmp/osx-smoke-output.txt
+        TMP_DIR="$(mktemp -d)"
+        export AX_FIXTURE_READY_FILE="$TMP_DIR/ready"
+        export AX_FIXTURE_STATE_FILE="$TMP_DIR/state.json"
+
+        "$FIXTURE_BIN" &
+        FIXTURE_PID=$!
+        trap 'kill "$FIXTURE_PID" || true' EXIT
+
+        for _ in $(seq 1 50); do
+          if [ -f "$AX_FIXTURE_READY_FILE" ]; then
+            break
+          fi
+          sleep 0.1
+        done
+
+        [ -f "$AX_FIXTURE_READY_FILE" ]
+        "$OSX_BIN" query --app "$FIXTURE_PID" --limit 5 --no-color AXWindow | tee /tmp/osx-smoke-output.txt
+        grep -q "AXFixtureApp Main Window" /tmp/osx-smoke-output.txt
 
     - name: Run Tests
       shell: bash
